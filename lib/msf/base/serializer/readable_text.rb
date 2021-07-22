@@ -1,4 +1,6 @@
 # -*- coding: binary -*-
+
+
 module Msf
 module Serializer
 
@@ -317,7 +319,7 @@ class ReadableText
     output << dump_traits(mod)
 
     # Actions
-    if mod.action
+    if mod.actions.any?
       output << "Available actions:\n"
       output << dump_module_actions(mod, indent)
     end
@@ -382,7 +384,7 @@ class ReadableText
     end
 
     # Actions
-    if mod.action
+    if mod.actions.any?
       output << "Available actions:\n"
       output << dump_module_actions(mod, indent)
     end
@@ -555,6 +557,7 @@ class ReadableText
     mod.options.sorted.each do |name, opt|
       val = mod.datastore[name].nil? ? opt.default : mod.datastore[name]
 
+      next unless Msf::OptCondition.show_option(mod, opt)
       next if (opt.advanced?)
       next if (opt.evasion?)
       next if (missing && opt.valid?(val))
@@ -599,6 +602,7 @@ class ReadableText
 
     mod.options.sorted.each do |name, opt|
       next unless opt.advanced?
+      next unless Msf::OptCondition.show_option(mod, opt)
       val = mod.datastore[name].nil? ? opt.default : mod.datastore[name]
       tbl << [ name, opt.display_value(val), opt.required? ? "yes" : "no", opt.desc ]
     end
@@ -1013,8 +1017,9 @@ class ReadableText
         end
 
         persist_list.each do |e|
-          if framework.jobs[job_id.to_s].ctx[1]
-             row[7] = 'true' if e['mod_options']['Options'] == framework.jobs[job_id.to_s].ctx[1].datastore
+          handler_ctx = framework.jobs[job_id.to_s].ctx[1]
+          if handler_ctx && handler_ctx.respond_to?(:datastore)
+             row[7] = 'true' if e['mod_options']['Options'] == handler_ctx.datastore
           end
         end
 
