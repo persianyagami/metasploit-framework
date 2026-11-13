@@ -1,19 +1,19 @@
-module ServiceServlet
+module Msf::WebServices::ServiceServlet
 
   def self.api_path
     '/api/v1/services'
   end
 
   def self.api_path_with_id
-    "#{ServiceServlet.api_path}/?:id?"
+    "#{self.api_path}/?:id?"
   end
 
   def self.registered(app)
-    app.get  ServiceServlet.api_path, &get_services
-    app.get  ServiceServlet.api_path_with_id, &get_services
-    app.post ServiceServlet.api_path, &report_service
-    app.put ServiceServlet.api_path_with_id, &update_service
-    app.delete ServiceServlet.api_path, &delete_service
+    app.get  self.api_path, &get_services
+    app.get  self.api_path_with_id, &get_services
+    app.post self.api_path, &report_service
+    app.put self.api_path_with_id, &update_service
+    app.delete self.api_path, &delete_service
   end
 
   #######
@@ -26,7 +26,7 @@ module ServiceServlet
       begin
         sanitized_params = sanitize_params(params, env['rack.request.query_hash'])
         data = get_db.services(sanitized_params)
-        includes = [:host]
+        includes = [:host, :parents]
         data = data.first if is_single_object?(data, sanitized_params)
         set_json_data_response(response: data, includes: includes)
       rescue => e
@@ -39,7 +39,7 @@ module ServiceServlet
     lambda {
       warden.authenticate!
       job = lambda { |opts| get_db.report_service(opts) }
-      includes = [:host]
+      includes = [:host, :parents]
       exec_report_job(request, includes, &job)
     }
   end

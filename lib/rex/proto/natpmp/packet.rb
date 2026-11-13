@@ -7,7 +7,7 @@
 
 module Rex
 module Proto
-module NATPMP
+module NATPMP::Packet
 
   # Return a NAT-PMP request to get the external address.
   def external_address_request
@@ -18,7 +18,7 @@ module NATPMP
     vprint_status("#{host}:#{port} - Probing NAT-PMP for external address")
     udp_sock.sendto(external_address_request, host, port, 0)
     external_address = nil
-    while (r = udp_sock.recvfrom(12, timeout) and r[1])
+    while (r = udp_sock.timed_recvfrom(12, timeout))
       (ver, op, result, epoch, external_address) = parse_external_address_response(r[0])
       if external_address
         vprint_good("#{host}:#{port} - NAT-PMP external address is #{external_address}")
@@ -43,7 +43,7 @@ module NATPMP
     # send it
     udp_sock.sendto(req, host, datastore['RPORT'], 0)
     # handle the reply
-    while (r = udp_sock.recvfrom(16, timeout) and r[1])
+    while (r = udp_sock.timed_recvfrom(16, timeout))
       (_, _, result, _, _, actual_ext_port, _) = parse_map_port_response(r[0])
       return (result == 0 ? actual_ext_port : nil)
     end

@@ -3,11 +3,10 @@
 require 'socket'
 require 'openssl'
 
-require 'rex/script'
+require 'rex/post/channel'
 require 'rex/post/meterpreter/extension_mapper'
 require 'rex/post/meterpreter/client_core'
 require 'rex/post/meterpreter/channel'
-require 'rex/post/meterpreter/channel_container'
 require 'rex/post/meterpreter/dependencies'
 require 'rex/post/meterpreter/object_aliases'
 require 'rex/post/meterpreter/packet'
@@ -36,8 +35,8 @@ end
 ###
 class Client
 
+  include Rex::Post::Channel::Container
   include Rex::Post::Meterpreter::PacketDispatcher
-  include Rex::Post::Meterpreter::ChannelContainer
   include Rex::Post::Meterpreter::PivotContainer
 
   #
@@ -112,6 +111,34 @@ class Client
     end
 
     shutdown_passive_dispatcher
+
+    shutdown_tlv_logging
+  end
+
+  #
+  # Wrap the given packet data with any prefixes and suffixes that are stored in
+  # the associated C2 profile server configuration (if it exists) and handle
+  # encoding of data
+  #
+  def wrap_packet(raw_bytes)
+    if self.c2_profile
+      raw_bytes = self.c2_profile.wrap_outbound_get(raw_bytes)
+    end
+
+    raw_bytes
+  end
+
+  #
+  # Unwrap the given packet data from any prefixes and suffixes that are stored in
+  # the associated C2 profile client configuration (if it exists) and handle
+  # decoding of data
+  #
+  def unwrap_packet(raw_bytes)
+    if self.c2_profile
+      raw_bytes = self.c2_profile.unwrap_inbound_post(raw_bytes)
+    end
+
+    raw_bytes
   end
 
   #
@@ -126,11 +153,13 @@ class Client
     self.target_id    = opts[:target_id]
     self.capabilities = opts[:capabilities] || {}
     self.commands     = []
-    self.last_checkin = Time.now
+    self.last_checkin = ::Time.now
 
     self.conn_id      = opts[:conn_id]
     self.url          = opts[:url]
     self.ssl          = opts[:ssl]
+
+    self.c2_profile = opts[:c2_profile]
 
     self.pivot_session = opts[:pivot_session]
     if self.pivot_session
@@ -165,8 +194,11 @@ class Client
         self.ssl_cert = ::File.read(opts[:ssl_cert])
       end
     end
+    # Use the debug build if specified
+    self.debug_build = opts[:debug_build]
 
-    # Protocol specific dispatch mixins go here, this may be neader with explicit Client classes
+
+    # Protocol specific dispatch mixins go here, this may be neater with explicit Client classes
     opts[:dispatch_ext].each {|dx| self.extend(dx)} if opts[:dispatch_ext]
     initialize_passive_dispatcher if opts[:passive_dispatcher]
 
@@ -317,7 +349,6 @@ class Client
   # registered extension that can be reached through client.ext.[extension].
   #
   def add_extension(name, commands=[])
-    self.commands |= []
     self.commands.concat(commands)
 
     # Check to see if this extension has already been loaded.
@@ -496,6 +527,14 @@ class Client
   # The timestamp of the last received response
   #
   attr_accessor :last_checkin
+  #
+  # Reference to the c2 profile instance associated with this connection, if any.
+  #
+  attr_accessor :c2_profile
+  #
+  # Whether or not to use a debug build for loaded extensions
+  #
+  attr_accessor :debug_build
 
 protected
   attr_accessor :parser, :ext_aliases # :nodoc:
@@ -504,4 +543,3 @@ protected
 end
 
 end; end; end
-

@@ -1,64 +1,97 @@
-
 ## Vulnerable Application
 
-  This module will attempt to enumerate which patches are applied to a
-  windows system based on the result of the WMI query: `SELECT HotFixID FROM Win32_QuickFixEngineering`.
+This module enumerates patches applied to a Windows system using the
+WMI query: `SELECT HotFixID, InstalledOn FROM Win32_QuickFixEngineering`.
+
 
 ## Verification Steps
 
-  1. Start msfconsole
-  2. Get meterpreter session
-  3. Do: ```use post/windows/gather/enum_patches```
-  4. Do: ```set SESSION <session id>```
-  5. Do: ```run```
+1. Start msfconsole
+2. Get meterpreter session
+3. Do: `use post/windows/gather/enum_patches`
+4. Do: `set SESSION <session id>`
+5. Do: `run`
 
 ## Options
 
-  **KB**
-
-  A comma separated list of KB patches to search for. Default is: `KB2871997, KB2928120`
-
-  **MSFLOCALS**
-
-  Search for missing patches for which there is a MSF local module. Default is `true`.
-
-  **SESSION**
-
-  The session to run this module on.
 
 ## Scenarios
 
-### Windows 7 (6.1 Build 7601, Service Pack 1).
+### Windows 11 Pro 10.0.22000 Build 22000 x64
 
-  ```
-  [*] Meterpreter session 1 opened (192.168.1.3:4444 -> 192.168.1.10:49223) at 2019-12-14 08:37:46 -0700
+```
+msf post(windows/gather/enum_patches) > set session 1
+session => 1
+msf post(windows/gather/enum_patches) > run
 
-  msf > use post/windows/gather/enum_patches
-  msf post(windows/gather/enum_patches) > set SESSION 1
-    SESSION => 1
-  msf post(windows/gather/enum_patches) > run
-    [-] Known bug in WMI query, try migrating to another process
-    [*] Post module execution completed
-  msf post(windows/gather/enum_patches) > sessions 1
-    [*] Starting interaction with 1...
-  meterpreter > run post/windows/manage/migrate
+[*] Running module against WINDEV2110EVAL (192.168.200.140)
 
-    [*] Running module against TEST-PC
-    [*] Current server process: Explorer.EXE (1908)
-    [*] Spawning notepad.exe process to migrate to
-    [+] Migrating to 3992
-    [+] Successfully migrated to process 3992
-  meterpreter > background
-    [*] Backgrounding session 1...
-  msf post(windows/gather/enum_patches) > run
+Installed Patches
+=================
 
-    [+] KB2871997 is missing
-    [+] KB2928120 is missing
-    [+] KB977165 - Possibly vulnerable to MS10-015 kitrap0d if Windows 2K SP4 - Windows 7 (x86)
-    [+] KB2305420 - Possibly vulnerable to MS10-092 schelevator if Vista, 7, and 2008
-    [+] KB2592799 - Possibly vulnerable to MS11-080 afdjoinleaf if XP SP2/SP3 Win 2k3 SP2
-    [+] KB2778930 - Possibly vulnerable to MS13-005 hwnd_broadcast, elevates from Low to Medium integrity
-    [+] KB2850851 - Possibly vulnerable to MS13-053 schlamperei if x86 Win7 SP0/SP1
-    [+] KB2870008 - Possibly vulnerable to MS13-081 track_popup_menu if x86 Windows 7 SP0/SP1
-    [*] Post module execution completed
-  ```
+  HotFix ID  Install Date
+  ---------  ------------
+  KB5009469  2/27/2022
+  KB5009641  2/26/2022
+  KB5011493  3/5/2022
+
+[*] Patch list saved to /root/.msf4/loot/20220911234321_default_192.168.200.140_enum_patches_485106.txt
+[*] Post module execution completed
+```
+
+### Windows 7 SP1 x64
+
+```
+msf post(windows/gather/enum_patches) > set session 1
+session => 1
+msf post(windows/gather/enum_patches) > run
+
+[*] Running module against TEST (192.168.200.190)
+
+Installed Patches
+=================
+
+  HotFix ID  Install Date
+  ---------  ------------
+  KB2533623  3/29/2019
+  KB2534111  2/1/2016
+  KB2639308  3/29/2019
+  KB2670838  3/29/2019
+  KB2729094  3/29/2019
+  KB2731771  3/29/2019
+  KB2786081  3/29/2019
+  KB2834140  3/29/2019
+  KB2841134  3/29/2019
+  KB2849696  3/29/2019
+  KB2849697  3/29/2019
+  KB2882822  3/29/2019
+  KB2888049  3/29/2019
+  KB2999226  9/4/2017
+  KB958488   5/26/2017
+  KB976902   11/21/2010
+
+[*] Patch list saved to /root/.msf4/loot/20220911233948_default_192.168.200.190_enum_patches_697182.txt
+[*] Post module execution completed
+```
+
+### Windows XP SP3 x86
+
+```
+msf post(windows/gather/enum_patches) > set session 1
+session => 1
+msf post(windows/gather/enum_patches) > run
+
+[*] Running module against WINXP (192.168.200.164)
+
+Installed Patches
+=================
+
+  HotFix ID  Install Date
+  ---------  ------------
+  KB811113   4/5/2013
+  KB936929   4/5/2013
+  Q147222
+
+[*] Patch list saved to /root/.msf4/loot/20220911233635_default_192.168.200.164_enum_patches_552914.txt
+[*] Post module execution completed
+```

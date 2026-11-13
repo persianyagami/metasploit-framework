@@ -1,4 +1,3 @@
-require 'msf/core/opt'
 
 RSpec.describe Msf::Opt do
   subject(:opt) { described_class }
@@ -24,7 +23,7 @@ RSpec.describe Msf::Opt do
 
     context 'LHOST' do
       subject { described_class::LHOST }
-      it { is_expected.to be_a(Msf::OptAddress) }
+      it { is_expected.to be_a(Msf::OptAddressLocal) }
     end
 
     context 'LPORT' do
@@ -34,12 +33,17 @@ RSpec.describe Msf::Opt do
 
     context 'Proxies' do
       subject { described_class::Proxies }
-      it { is_expected.to be_a(Msf::OptString) }
+      it { is_expected.to be_a(Msf::OptProxies) }
     end
 
     context 'RHOST' do
       subject { described_class::RHOST }
-      it { is_expected.to be_a(Msf::OptAddressRange) }
+      it { is_expected.to be_a(Msf::OptRhosts) }
+    end
+
+    context 'RHOSTS' do
+      subject { described_class::RHOST }
+      it { is_expected.to be_a(Msf::OptRhosts) }
     end
 
     context 'RPORT' do
@@ -69,7 +73,7 @@ RSpec.describe Msf::Opt do
 
     context 'LHOST()' do
       subject { described_class::LHOST(default) }
-      it { is_expected.to be_a(Msf::OptAddress) }
+      it { is_expected.to be_a(Msf::OptAddressLocal) }
       specify 'sets default' do
         expect(subject.default).to eq(default)
       end
@@ -85,7 +89,15 @@ RSpec.describe Msf::Opt do
 
     context 'Proxies()' do
       subject { described_class::Proxies(default) }
-      it { is_expected.to be_a(Msf::OptString) }
+      it { is_expected.to be_a(Msf::OptProxies) }
+      specify 'sets default' do
+        expect(subject.default).to eq(default)
+      end
+    end
+
+    context 'RHOSTS()' do
+      subject { described_class::RHOST(default) }
+      it { is_expected.to be_a(Msf::OptRhosts) }
       specify 'sets default' do
         expect(subject.default).to eq(default)
       end
@@ -93,7 +105,7 @@ RSpec.describe Msf::Opt do
 
     context 'RHOST()' do
       subject { described_class::RHOST(default) }
-      it { is_expected.to be_a(Msf::OptAddressRange) }
+      it { is_expected.to be_a(Msf::OptRhosts) }
       specify 'sets default' do
         expect(subject.default).to eq(default)
       end

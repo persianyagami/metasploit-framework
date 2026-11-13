@@ -1,7 +1,6 @@
 require 'em-http-request'
 require 'json'
 
-require 'msf/core/rpc'
 
 module Msf::RPC::JSON
 
@@ -56,9 +55,9 @@ module Msf::RPC::JSON
       @symbolize_names = symbolize_names
       @is_notification = is_notification
       @headers = {
-          'Accept': JSON_MEDIA_TYPE,
+          Accept: JSON_MEDIA_TYPE,
           'Content-Type': JSON_MEDIA_TYPE,
-          'Authorization': "Bearer #{@api_token}"
+          Authorization: "Bearer #{@api_token}"
       }
 
       absolute_method_name = @namespace.nil? ? method : "#{@namespace}.#{method}"
@@ -139,7 +138,7 @@ module Msf::RPC::JSON
 
     # Validate the JSON-RPC response.
     # @param response [Hash] the JSON-RPC response
-    # @returns [Boolean] true if the JSON-RPC response is valid; otherwise, false.
+    # @return [Boolean] true if the JSON-RPC response is valid; otherwise, false.
     def valid_rpc_response?(response)
       # validate response is an object
       return false unless response.is_a?(Hash)

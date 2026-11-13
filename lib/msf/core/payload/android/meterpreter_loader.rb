@@ -1,8 +1,5 @@
 # -*- coding: binary -*-
 
-require 'msf/core'
-require 'msf/base/sessions/meterpreter_options'
-require 'msf/core/payload/uuid/options'
 
 module Msf
 
@@ -16,7 +13,7 @@ module Payload::Android::MeterpreterLoader
 
   include Msf::Payload::Android
   include Msf::Payload::UUID::Options
-  include Msf::Sessions::MeterpreterOptions
+  include Msf::Sessions::MeterpreterOptions::Android
 
   def initialize(info={})
     super(update_info(info,

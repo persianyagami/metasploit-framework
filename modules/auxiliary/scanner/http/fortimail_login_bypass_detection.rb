@@ -20,12 +20,11 @@ class MetasploitModule < Msf::Auxiliary
         'Juerg Schweingruber <juerg.schweingruber[at]redguard.ch>', # Vulnerability Re-Discovery
         'Patrick Schmid <patrick.schmid[at]redguard.ch>' # Exploit Development & MSF module
       ],
-      'References' =>
-        [
-          ['CVE', '2020-9294'],
-          ['URL', 'https://fortiguard.com/psirt/FG-IR-20-045'],
-          ['URL', 'https://www.redguard.ch/blog/2020/07/02/fortimail-unauthenticated-login-bypass/']
-        ],
+      'References' => [
+        ['CVE', '2020-9294'],
+        ['URL', 'https://www.fortiguard.com/psirt/FG-IR-20-045'],
+        ['URL', 'https://www.redguard.ch/blog/2020/07/02/fortimail-unauthenticated-login-bypass/']
+      ],
       'License' => MSF_LICENSE
     )
 
@@ -71,7 +70,7 @@ class MetasploitModule < Msf::Auxiliary
 
     version_raw = res.body[/fml-admin-login-(\d+).js/, 1]
     version = version_raw.to_i
-    unless (res.body.include?('newpassword') && (version.between?(140, 160) || version.between?(730, 745) || version.between?(250, 263)))
+    unless res.body.include?('newpassword') && (version.between?(140, 160) || version.between?(730, 745) || version.between?(250, 263))
       print_bad("#{ip} - Not vulnerable version (Build: #{version_raw}) of FortiMail detected")
       return :abort
     end
@@ -85,7 +84,9 @@ class MetasploitModule < Msf::Auxiliary
       refs: references
     )
   rescue ::Rex::ConnectionRefused, ::Rex::HostUnreachable, ::Rex::ConnectionTimeout
+    # noop
   rescue ::Timeout::Error, ::Errno::EPIPE
+    # noop
   rescue ::OpenSSL::SSL::SSLError => e
     return if (e.to_s.match(/^SSL_connect /)) # strange errors / exception if SSL connection aborted
   end

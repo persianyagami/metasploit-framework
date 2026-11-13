@@ -1,5 +1,6 @@
 # -*- coding: binary -*-
 require 'openssl'
+require 'rex/post/meterpreter/command_mapper'
 
 module Rex
 module Post
@@ -10,6 +11,7 @@ module Meterpreter
 #
 PACKET_TYPE_REQUEST         = 0
 PACKET_TYPE_RESPONSE        = 1
+PACKET_TYPE_CONFIG          = 2
 PACKET_TYPE_PLAIN_REQUEST   = 10
 PACKET_TYPE_PLAIN_RESPONSE  = 11
 
@@ -90,20 +92,6 @@ TLV_TYPE_MIGRATE_STUB        = TLV_META_TYPE_RAW    | 411
 TLV_TYPE_LIB_LOADER_NAME     = TLV_META_TYPE_STRING | 412
 TLV_TYPE_LIB_LOADER_ORDINAL  = TLV_META_TYPE_UINT   | 413
 
-TLV_TYPE_TRANS_TYPE          = TLV_META_TYPE_UINT   | 430
-TLV_TYPE_TRANS_URL           = TLV_META_TYPE_STRING | 431
-TLV_TYPE_TRANS_UA            = TLV_META_TYPE_STRING | 432
-TLV_TYPE_TRANS_COMM_TIMEOUT  = TLV_META_TYPE_UINT   | 433
-TLV_TYPE_TRANS_SESSION_EXP   = TLV_META_TYPE_UINT   | 434
-TLV_TYPE_TRANS_CERT_HASH     = TLV_META_TYPE_RAW    | 435
-TLV_TYPE_TRANS_PROXY_HOST    = TLV_META_TYPE_STRING | 436
-TLV_TYPE_TRANS_PROXY_USER    = TLV_META_TYPE_STRING | 437
-TLV_TYPE_TRANS_PROXY_PASS    = TLV_META_TYPE_STRING | 438
-TLV_TYPE_TRANS_RETRY_TOTAL   = TLV_META_TYPE_UINT   | 439
-TLV_TYPE_TRANS_RETRY_WAIT    = TLV_META_TYPE_UINT   | 440
-TLV_TYPE_TRANS_HEADERS       = TLV_META_TYPE_STRING | 441
-TLV_TYPE_TRANS_GROUP         = TLV_META_TYPE_GROUP  | 442
-
 TLV_TYPE_MACHINE_ID          = TLV_META_TYPE_STRING | 460
 TLV_TYPE_UUID                = TLV_META_TYPE_RAW    | 461
 TLV_TYPE_SESSION_GUID        = TLV_META_TYPE_RAW    | 462
@@ -120,6 +108,49 @@ TLV_TYPE_PIVOT_ID              = TLV_META_TYPE_RAW    |  650
 TLV_TYPE_PIVOT_STAGE_DATA      = TLV_META_TYPE_RAW    |  651
 TLV_TYPE_PIVOT_NAMED_PIPE_NAME = TLV_META_TYPE_STRING |  653
 
+#
+# Configuration & C2 options
+#
+TLV_TYPE_SESSION_EXPIRY        = TLV_META_TYPE_UINT   | 700 # Session expiration time
+TLV_TYPE_EXITFUNC              = TLV_META_TYPE_UINT   | 701 # identifier of the exit function to use
+TLV_TYPE_DEBUG_LOG             = TLV_META_TYPE_STRING | 702 # path to write debug log
+TLV_TYPE_EXTENSION             = TLV_META_TYPE_GROUP  | 703 # Group containing extension info
+TLV_TYPE_C2                    = TLV_META_TYPE_GROUP  | 704 # a C2/transport grouping
+TLV_TYPE_C2_COMM_TIMEOUT       = TLV_META_TYPE_UINT   | 705 # the timeout for this C2 group
+TLV_TYPE_C2_RETRY_TOTAL        = TLV_META_TYPE_UINT   | 706 # number of times to retry this C2
+TLV_TYPE_C2_RETRY_WAIT         = TLV_META_TYPE_UINT   | 707 # how long to wait between reconnect attempts
+TLV_TYPE_C2_URL                = TLV_META_TYPE_STRING | 708 # base URL of this C2 (scheme://host:port/uri)
+TLV_TYPE_C2_URI                = TLV_META_TYPE_STRING | 709 # URI to append to base URL (for HTTP(s)), if any
+TLV_TYPE_C2_PROXY_URL          = TLV_META_TYPE_STRING | 710 # Proxy URL
+TLV_TYPE_C2_PROXY_USER         = TLV_META_TYPE_STRING | 711 # Proxy user name
+TLV_TYPE_C2_PROXY_PASS         = TLV_META_TYPE_STRING | 712 # Proxy password
+TLV_TYPE_C2_GET                = TLV_META_TYPE_GROUP  | 713 # A grouping of params associated with GET requests
+TLV_TYPE_C2_POST               = TLV_META_TYPE_GROUP  | 714 # A grouping of params associated with POST requests
+TLV_TYPE_C2_HEADERS            = TLV_META_TYPE_STRING | 715 # Custom headers
+TLV_TYPE_C2_UA                 = TLV_META_TYPE_STRING | 716 # User agent
+TLV_TYPE_C2_CERT_HASH          = TLV_META_TYPE_RAW    | 717 # Expected SSL certificate hash
+TLV_TYPE_C2_PREFIX             = TLV_META_TYPE_RAW    | 718 # Data to prepend to the outgoing payload
+TLV_TYPE_C2_SUFFIX             = TLV_META_TYPE_RAW    | 719 # Data to append to the outgoing payload
+TLV_TYPE_C2_ENC_INBOUND        = TLV_META_TYPE_UINT   | 720 # Server-inbound (client->server) body/metadata encoding
+TLV_TYPE_C2_PREFIX_SKIP        = TLV_META_TYPE_UINT   | 721 # Size of prefix to skip (in bytes)
+TLV_TYPE_C2_SUFFIX_SKIP        = TLV_META_TYPE_UINT   | 722 # Size of suffix to skip (in bytes)
+TLV_TYPE_C2_UUID_COOKIE        = TLV_META_TYPE_STRING | 723 # Name of the cookie to put the UUID in
+TLV_TYPE_C2_UUID_GET           = TLV_META_TYPE_STRING | 724 # Name of the GET parameter to put the UUID in
+TLV_TYPE_C2_UUID_HEADER        = TLV_META_TYPE_STRING | 725 # Name of the header to put the UUID in
+TLV_TYPE_C2_UUID               = TLV_META_TYPE_STRING | 726 # string representation of the UUID for C2s
+TLV_TYPE_SESSION_FLAGS         = TLV_META_TYPE_UINT   | 727 # session-level config flags (e.g. FLAG_STAGELESS, FLAG_DEBUG)
+TLV_TYPE_C2_ENC_OUTBOUND       = TLV_META_TYPE_UINT   | 728 # Client->server (request) body encoding (POST only)
+TLV_TYPE_C2_ENC_UUID           = TLV_META_TYPE_UINT   | 729 # Encoding applied to the UUID before placement (URL/header/cookie)
+TLV_TYPE_C2_UUID_PREFIX        = TLV_META_TYPE_STRING | 730 # String to prepend to the encoded UUID
+TLV_TYPE_C2_UUID_SUFFIX        = TLV_META_TYPE_STRING | 731 # String to append to the encoded UUID
+
+#
+# C2 Encoding flags
+#
+C2_ENCODING_NONE   = 0 # No encoding at all
+C2_ENCODING_B64    = 1 # Base64 encoding
+C2_ENCODING_B64URL = 2 # Base64 encoding with URI-safe characters
+C2_ENCODING_URL    = 3 # URL encoding
 
 #
 # Core flags
@@ -134,354 +165,30 @@ LOAD_LIBRARY_FLAG_LOCAL     = (1 << 2)
 GUID_SIZE = 16
 NULL_GUID = "\x00" * GUID_SIZE
 
-#
-# Mapping of command strings to identifiers
-#
-#
-COMMAND_ID_START_CORE       = 0
-COMMAND_ID_START_STDAPI     = 1000
-COMMAND_ID_START_PRIV       = 2000
-COMMAND_ID_START_EXTAPI     = 3000
-COMMAND_ID_START_SNIFFER    = 4000
-COMMAND_ID_START_ANDROID    = 5000
-COMMAND_ID_START_NETWORKPUG = 6000
-COMMAND_ID_START_WINPMEM    = 7000
-COMMAND_ID_START_KIWI       = 8000
-COMMAND_ID_START_APPAPI     = 9000
-COMMAND_ID_START_UNHOOK     = 10000
-COMMAND_ID_START_ESPIA      = 11000
-COMMAND_ID_START_INCOGNITO  = 12000
-COMMAND_ID_START_PYTHON     = 13000
-COMMAND_ID_START_POWERSHELL = 14000
-COMMAND_ID_START_LANATTACKS = 15000
-COMMAND_ID_START_PEINJECTOR = 16000
-COMMAND_ID_START_MIMIKATZ   = 17000
-
-COMMAND_ID_MAP_CORE = {
-  'core_channel_close'            => COMMAND_ID_START_CORE + 1,
-  'core_channel_eof'              => COMMAND_ID_START_CORE + 2,
-  'core_channel_interact'         => COMMAND_ID_START_CORE + 3,
-  'core_channel_open'             => COMMAND_ID_START_CORE + 4,
-  'core_channel_read'             => COMMAND_ID_START_CORE + 5,
-  'core_channel_seek'             => COMMAND_ID_START_CORE + 6,
-  'core_channel_tell'             => COMMAND_ID_START_CORE + 7,
-  'core_channel_write'            => COMMAND_ID_START_CORE + 8,
-  'core_console_write'            => COMMAND_ID_START_CORE + 9,
-  'core_enumextcmd'               => COMMAND_ID_START_CORE + 10,
-  'core_get_session_guid'         => COMMAND_ID_START_CORE + 11,
-  'core_loadlib'                  => COMMAND_ID_START_CORE + 12,
-  'core_machine_id'               => COMMAND_ID_START_CORE + 13,
-  'core_migrate'                  => COMMAND_ID_START_CORE + 14,
-  'core_native_arch'              => COMMAND_ID_START_CORE + 15,
-  'core_negotiate_tlv_encryption' => COMMAND_ID_START_CORE + 16,
-  'core_patch_url'                => COMMAND_ID_START_CORE + 17,
-  'core_pivot_add'                => COMMAND_ID_START_CORE + 18,
-  'core_pivot_remove'             => COMMAND_ID_START_CORE + 19,
-  'core_pivot_session_died'       => COMMAND_ID_START_CORE + 20,
-  'core_set_session_guid'         => COMMAND_ID_START_CORE + 21,
-  'core_set_uuid'                 => COMMAND_ID_START_CORE + 22,
-  'core_shutdown'                 => COMMAND_ID_START_CORE + 23,
-  'core_transport_add'            => COMMAND_ID_START_CORE + 24,
-  'core_transport_change'         => COMMAND_ID_START_CORE + 25,
-  'core_transport_getcerthash'    => COMMAND_ID_START_CORE + 26,
-  'core_transport_list'           => COMMAND_ID_START_CORE + 27,
-  'core_transport_next'           => COMMAND_ID_START_CORE + 28,
-  'core_transport_prev'           => COMMAND_ID_START_CORE + 29,
-  'core_transport_remove'         => COMMAND_ID_START_CORE + 30,
-  'core_transport_setcerthash'    => COMMAND_ID_START_CORE + 31,
-  'core_transport_set_timeouts'   => COMMAND_ID_START_CORE + 32,
-  'core_transport_sleep'          => COMMAND_ID_START_CORE + 33,
-}
-
-COMMAND_ID_MAP_STDAPI = {
-  'stdapi_fs_chdir'                           => COMMAND_ID_START_STDAPI + 1,
-  'stdapi_fs_chmod'                           => COMMAND_ID_START_STDAPI + 2,
-  'stdapi_fs_delete_dir'                      => COMMAND_ID_START_STDAPI + 3,
-  'stdapi_fs_delete_file'                     => COMMAND_ID_START_STDAPI + 4,
-  'stdapi_fs_file_copy'                       => COMMAND_ID_START_STDAPI + 5,
-  'stdapi_fs_file_expand_path'                => COMMAND_ID_START_STDAPI + 6,
-  'stdapi_fs_file_move'                       => COMMAND_ID_START_STDAPI + 7,
-  'stdapi_fs_getwd'                           => COMMAND_ID_START_STDAPI + 8,
-  'stdapi_fs_ls'                              => COMMAND_ID_START_STDAPI + 9,
-  'stdapi_fs_md5'                             => COMMAND_ID_START_STDAPI + 10,
-  'stdapi_fs_mkdir'                           => COMMAND_ID_START_STDAPI + 11,
-  'stdapi_fs_mount_show'                      => COMMAND_ID_START_STDAPI + 12,
-  'stdapi_fs_search'                          => COMMAND_ID_START_STDAPI + 13,
-  'stdapi_fs_separator'                       => COMMAND_ID_START_STDAPI + 14,
-  'stdapi_fs_sha1'                            => COMMAND_ID_START_STDAPI + 15,
-  'stdapi_fs_stat'                            => COMMAND_ID_START_STDAPI + 16,
-  'stdapi_net_config_add_route'               => COMMAND_ID_START_STDAPI + 17,
-  'stdapi_net_config_get_arp_table'           => COMMAND_ID_START_STDAPI + 18,
-  'stdapi_net_config_get_interfaces'          => COMMAND_ID_START_STDAPI + 19,
-  'stdapi_net_config_get_netstat'             => COMMAND_ID_START_STDAPI + 20,
-  'stdapi_net_config_get_proxy'               => COMMAND_ID_START_STDAPI + 21,
-  'stdapi_net_config_get_routes'              => COMMAND_ID_START_STDAPI + 22,
-  'stdapi_net_config_remove_route'            => COMMAND_ID_START_STDAPI + 23,
-  'stdapi_net_resolve_host'                   => COMMAND_ID_START_STDAPI + 24,
-  'stdapi_net_resolve_hosts'                  => COMMAND_ID_START_STDAPI + 25,
-  'stdapi_net_socket_tcp_shutdown'            => COMMAND_ID_START_STDAPI + 26,
-  'stdapi_net_tcp_channel_open'               => COMMAND_ID_START_STDAPI + 27,
-  'stdapi_railgun_api'                        => COMMAND_ID_START_STDAPI + 28,
-  'stdapi_railgun_api_multi'                  => COMMAND_ID_START_STDAPI + 29,
-  'stdapi_railgun_memread'                    => COMMAND_ID_START_STDAPI + 30,
-  'stdapi_railgun_memwrite'                   => COMMAND_ID_START_STDAPI + 31,
-  'stdapi_registry_check_key_exists'          => COMMAND_ID_START_STDAPI + 32,
-  'stdapi_registry_close_key'                 => COMMAND_ID_START_STDAPI + 33,
-  'stdapi_registry_create_key'                => COMMAND_ID_START_STDAPI + 34,
-  'stdapi_registry_delete_key'                => COMMAND_ID_START_STDAPI + 35,
-  'stdapi_registry_delete_value'              => COMMAND_ID_START_STDAPI + 36,
-  'stdapi_registry_enum_key'                  => COMMAND_ID_START_STDAPI + 37,
-  'stdapi_registry_enum_key_direct'           => COMMAND_ID_START_STDAPI + 38,
-  'stdapi_registry_enum_value'                => COMMAND_ID_START_STDAPI + 39,
-  'stdapi_registry_enum_value_direct'         => COMMAND_ID_START_STDAPI + 40,
-  'stdapi_registry_load_key'                  => COMMAND_ID_START_STDAPI + 41,
-  'stdapi_registry_open_key'                  => COMMAND_ID_START_STDAPI + 42,
-  'stdapi_registry_open_remote_key'           => COMMAND_ID_START_STDAPI + 43,
-  'stdapi_registry_query_class'               => COMMAND_ID_START_STDAPI + 44,
-  'stdapi_registry_query_value'               => COMMAND_ID_START_STDAPI + 45,
-  'stdapi_registry_query_value_direct'        => COMMAND_ID_START_STDAPI + 46,
-  'stdapi_registry_set_value'                 => COMMAND_ID_START_STDAPI + 47,
-  'stdapi_registry_set_value_direct'          => COMMAND_ID_START_STDAPI + 48,
-  'stdapi_registry_unload_key'                => COMMAND_ID_START_STDAPI + 49,
-  'stdapi_sys_config_driver_list'             => COMMAND_ID_START_STDAPI + 50,
-  'stdapi_sys_config_drop_token'              => COMMAND_ID_START_STDAPI + 51,
-  'stdapi_sys_config_getenv'                  => COMMAND_ID_START_STDAPI + 52,
-  'stdapi_sys_config_getprivs'                => COMMAND_ID_START_STDAPI + 53,
-  'stdapi_sys_config_getsid'                  => COMMAND_ID_START_STDAPI + 54,
-  'stdapi_sys_config_getuid'                  => COMMAND_ID_START_STDAPI + 55,
-  'stdapi_sys_config_localtime'               => COMMAND_ID_START_STDAPI + 56,
-  'stdapi_sys_config_rev2self'                => COMMAND_ID_START_STDAPI + 57,
-  'stdapi_sys_config_steal_token'             => COMMAND_ID_START_STDAPI + 58,
-  'stdapi_sys_config_sysinfo'                 => COMMAND_ID_START_STDAPI + 59,
-  'stdapi_sys_eventlog_clear'                 => COMMAND_ID_START_STDAPI + 60,
-  'stdapi_sys_eventlog_close'                 => COMMAND_ID_START_STDAPI + 61,
-  'stdapi_sys_eventlog_numrecords'            => COMMAND_ID_START_STDAPI + 62,
-  'stdapi_sys_eventlog_oldest'                => COMMAND_ID_START_STDAPI + 63,
-  'stdapi_sys_eventlog_open'                  => COMMAND_ID_START_STDAPI + 64,
-  'stdapi_sys_eventlog_read'                  => COMMAND_ID_START_STDAPI + 65,
-  'stdapi_sys_power_exitwindows'              => COMMAND_ID_START_STDAPI + 66,
-  'stdapi_sys_process_attach'                 => COMMAND_ID_START_STDAPI + 67,
-  'stdapi_sys_process_close'                  => COMMAND_ID_START_STDAPI + 68,
-  'stdapi_sys_process_execute'                => COMMAND_ID_START_STDAPI + 69,
-  'stdapi_sys_process_get_info'               => COMMAND_ID_START_STDAPI + 70,
-  'stdapi_sys_process_get_processes'          => COMMAND_ID_START_STDAPI + 71,
-  'stdapi_sys_process_getpid'                 => COMMAND_ID_START_STDAPI + 72,
-  'stdapi_sys_process_image_get_images'       => COMMAND_ID_START_STDAPI + 73,
-  'stdapi_sys_process_image_get_proc_address' => COMMAND_ID_START_STDAPI + 74,
-  'stdapi_sys_process_image_load'             => COMMAND_ID_START_STDAPI + 75,
-  'stdapi_sys_process_image_unload'           => COMMAND_ID_START_STDAPI + 76,
-  'stdapi_sys_process_kill'                   => COMMAND_ID_START_STDAPI + 77,
-  'stdapi_sys_process_memory_allocate'        => COMMAND_ID_START_STDAPI + 78,
-  'stdapi_sys_process_memory_free'            => COMMAND_ID_START_STDAPI + 79,
-  'stdapi_sys_process_memory_lock'            => COMMAND_ID_START_STDAPI + 80,
-  'stdapi_sys_process_memory_protect'         => COMMAND_ID_START_STDAPI + 81,
-  'stdapi_sys_process_memory_query'           => COMMAND_ID_START_STDAPI + 82,
-  'stdapi_sys_process_memory_read'            => COMMAND_ID_START_STDAPI + 83,
-  'stdapi_sys_process_memory_unlock'          => COMMAND_ID_START_STDAPI + 84,
-  'stdapi_sys_process_memory_write'           => COMMAND_ID_START_STDAPI + 85,
-  'stdapi_sys_process_thread_close'           => COMMAND_ID_START_STDAPI + 86,
-  'stdapi_sys_process_thread_create'          => COMMAND_ID_START_STDAPI + 87,
-  'stdapi_sys_process_thread_get_threads'     => COMMAND_ID_START_STDAPI + 88,
-  'stdapi_sys_process_thread_open'            => COMMAND_ID_START_STDAPI + 89,
-  'stdapi_sys_process_thread_query_regs'      => COMMAND_ID_START_STDAPI + 90,
-  'stdapi_sys_process_thread_resume'          => COMMAND_ID_START_STDAPI + 91,
-  'stdapi_sys_process_thread_set_regs'        => COMMAND_ID_START_STDAPI + 92,
-  'stdapi_sys_process_thread_suspend'         => COMMAND_ID_START_STDAPI + 93,
-  'stdapi_sys_process_thread_terminate'       => COMMAND_ID_START_STDAPI + 94,
-  'stdapi_sys_process_wait'                   => COMMAND_ID_START_STDAPI + 95,
-  'stdapi_ui_desktop_enum'                    => COMMAND_ID_START_STDAPI + 96,
-  'stdapi_ui_desktop_get'                     => COMMAND_ID_START_STDAPI + 97,
-  'stdapi_ui_desktop_screenshot'              => COMMAND_ID_START_STDAPI + 98,
-  'stdapi_ui_desktop_set'                     => COMMAND_ID_START_STDAPI + 99,
-  'stdapi_ui_enable_keyboard'                 => COMMAND_ID_START_STDAPI + 100,
-  'stdapi_ui_enable_mouse'                    => COMMAND_ID_START_STDAPI + 101,
-  'stdapi_ui_get_idle_time'                   => COMMAND_ID_START_STDAPI + 102,
-  'stdapi_ui_get_keys_utf8'                   => COMMAND_ID_START_STDAPI + 103,
-  'stdapi_ui_send_keyevent'                   => COMMAND_ID_START_STDAPI + 104,
-  'stdapi_ui_send_keys'                       => COMMAND_ID_START_STDAPI + 105,
-  'stdapi_ui_send_mouse'                      => COMMAND_ID_START_STDAPI + 106,
-  'stdapi_ui_start_keyscan'                   => COMMAND_ID_START_STDAPI + 107,
-  'stdapi_ui_stop_keyscan'                    => COMMAND_ID_START_STDAPI + 108,
-  'stdapi_ui_unlock_desktop'                  => COMMAND_ID_START_STDAPI + 109,
-  'stdapi_webcam_audio_record'                => COMMAND_ID_START_STDAPI + 110,
-  'stdapi_webcam_get_frame'                   => COMMAND_ID_START_STDAPI + 111,
-  'stdapi_webcam_list'                        => COMMAND_ID_START_STDAPI + 112,
-  'stdapi_webcam_start'                       => COMMAND_ID_START_STDAPI + 113,
-  'stdapi_webcam_stop'                        => COMMAND_ID_START_STDAPI + 114,
-}
-
-COMMAND_ID_MAP_ANDROID = {
-  'android_activity_start'   => COMMAND_ID_START_ANDROID + 1,
-  'android_check_root'       => COMMAND_ID_START_ANDROID + 2,
-  'android_device_shutdown'  => COMMAND_ID_START_ANDROID + 3,
-  'android_dump_calllog'     => COMMAND_ID_START_ANDROID + 4,
-  'android_dump_contacts'    => COMMAND_ID_START_ANDROID + 5,
-  'android_dump_sms'         => COMMAND_ID_START_ANDROID + 6,
-  'android_geolocate'        => COMMAND_ID_START_ANDROID + 7,
-  'android_hide_app_icon'    => COMMAND_ID_START_ANDROID + 8,
-  'android_interval_collect' => COMMAND_ID_START_ANDROID + 9,
-  'android_send_sms'         => COMMAND_ID_START_ANDROID + 10,
-  'android_set_audio_mode'   => COMMAND_ID_START_ANDROID + 11,
-  'android_set_wallpaper'    => COMMAND_ID_START_ANDROID + 12,
-  'android_sqlite_query'     => COMMAND_ID_START_ANDROID + 13,
-  'android_wakelock'         => COMMAND_ID_START_ANDROID + 14,
-  'android_wlan_geolocate'   => COMMAND_ID_START_ANDROID + 15,
-}
-
-COMMAND_ID_MAP_APPAPI = {
-  'appapi_app_install'   => COMMAND_ID_START_APPAPI + 1,
-  'appapi_app_list'      => COMMAND_ID_START_APPAPI + 2,
-  'appapi_app_run'       => COMMAND_ID_START_APPAPI + 3,
-  'appapi_app_uninstall' => COMMAND_ID_START_APPAPI + 4,
-}
-
-COMMAND_ID_MAP_WINPMEM = {
-  'winpmem_dump_ram' => COMMAND_ID_START_WINPMEM + 1,
-}
-
-COMMAND_ID_MAP_ESPIA = {
-  'espia_image_get_dev_screen' => COMMAND_ID_START_ESPIA + 1,
-}
-
-COMMAND_ID_MAP_EXTAPI = {
-  'extapi_adsi_domain_query'        => COMMAND_ID_START_EXTAPI + 1,
-  'extapi_clipboard_get_data'       => COMMAND_ID_START_EXTAPI + 2,
-  'extapi_clipboard_monitor_dump'   => COMMAND_ID_START_EXTAPI + 3,
-  'extapi_clipboard_monitor_pause'  => COMMAND_ID_START_EXTAPI + 4,
-  'extapi_clipboard_monitor_purge'  => COMMAND_ID_START_EXTAPI + 5,
-  'extapi_clipboard_monitor_resume' => COMMAND_ID_START_EXTAPI + 6,
-  'extapi_clipboard_monitor_start'  => COMMAND_ID_START_EXTAPI + 7,
-  'extapi_clipboard_monitor_stop'   => COMMAND_ID_START_EXTAPI + 8,
-  'extapi_clipboard_set_data'       => COMMAND_ID_START_EXTAPI + 9,
-  'extapi_ntds_parse'               => COMMAND_ID_START_EXTAPI + 10,
-  'extapi_pageant_send_query'       => COMMAND_ID_START_EXTAPI + 11,
-  'extapi_service_control'          => COMMAND_ID_START_EXTAPI + 12,
-  'extapi_service_enum'             => COMMAND_ID_START_EXTAPI + 13,
-  'extapi_service_query'            => COMMAND_ID_START_EXTAPI + 14,
-  'extapi_window_enum'              => COMMAND_ID_START_EXTAPI + 15,
-  'extapi_wmi_query'                => COMMAND_ID_START_EXTAPI + 16,
-}
-
-COMMAND_ID_MAP_INCOGNITO = {
-  'incognito_add_group_user'      => COMMAND_ID_START_INCOGNITO + 1,
-  'incognito_add_localgroup_user' => COMMAND_ID_START_INCOGNITO + 2,
-  'incognito_add_user'            => COMMAND_ID_START_INCOGNITO + 3,
-  'incognito_impersonate_token'   => COMMAND_ID_START_INCOGNITO + 4,
-  'incognito_list_tokens'         => COMMAND_ID_START_INCOGNITO + 5,
-  'incognito_snarf_hashes'        => COMMAND_ID_START_INCOGNITO + 6,
-}
-
-COMMAND_ID_MAP_KIWI = {
-  'kiwi_exec_cmd' => COMMAND_ID_START_KIWI + 1,
-}
-
-COMMAND_ID_MAP_LANATTACKS = {
-  'lanattacks_add_tftp_file'   => COMMAND_ID_START_LANATTACKS + 1,
-  'lanattacks_dhcp_log'        => COMMAND_ID_START_LANATTACKS + 2,
-  'lanattacks_reset_dhcp'      => COMMAND_ID_START_LANATTACKS + 3,
-  'lanattacks_reset_tftp'      => COMMAND_ID_START_LANATTACKS + 4,
-  'lanattacks_set_dhcp_option' => COMMAND_ID_START_LANATTACKS + 5,
-  'lanattacks_start_dhcp'      => COMMAND_ID_START_LANATTACKS + 6,
-  'lanattacks_start_tftp'      => COMMAND_ID_START_LANATTACKS + 7,
-  'lanattacks_stop_dhcp'       => COMMAND_ID_START_LANATTACKS + 8,
-  'lanattacks_stop_tftp'       => COMMAND_ID_START_LANATTACKS + 9,
-}
-
-COMMAND_ID_MAP_MIMIKATZ = {
-  'mimikatz_custom_command' => COMMAND_ID_START_MIMIKATZ + 1,
-}
-
-COMMAND_ID_MAP_NETWORKPUG = {
-  'networkpug_start' => COMMAND_ID_START_NETWORKPUG + 1,
-  'networkpug_stop'  => COMMAND_ID_START_NETWORKPUG + 2,
-}
-
-COMMAND_ID_MAP_PEINJECTOR = {
-  'peinjector_inject_shellcode' => COMMAND_ID_START_PEINJECTOR + 1,
-}
-
-COMMAND_ID_MAP_POWERSHELL = {
-  'powershell_assembly_load'  => COMMAND_ID_START_POWERSHELL + 1,
-  'powershell_execute'        => COMMAND_ID_START_POWERSHELL + 2,
-  'powershell_session_remove' => COMMAND_ID_START_POWERSHELL + 3,
-  'powershell_shell'          => COMMAND_ID_START_POWERSHELL + 4,
-}
-
-COMMAND_ID_MAP_PRIV = {
-  'priv_elevate_getsystem'          => COMMAND_ID_START_PRIV + 1,
-  'priv_fs_blank_directory_mace'    => COMMAND_ID_START_PRIV + 2,
-  'priv_fs_blank_file_mace'         => COMMAND_ID_START_PRIV + 3,
-  'priv_fs_get_file_mace'           => COMMAND_ID_START_PRIV + 4,
-  'priv_fs_set_file_mace'           => COMMAND_ID_START_PRIV + 5,
-  'priv_fs_set_file_mace_from_file' => COMMAND_ID_START_PRIV + 6,
-  'priv_passwd_get_sam_hashes'      => COMMAND_ID_START_PRIV + 7,
-}
-
-COMMAND_ID_MAP_PYTHON = {
-  'python_execute' => COMMAND_ID_START_PYTHON + 1,
-  'python_reset'   => COMMAND_ID_START_PYTHON + 2,
-}
-
-COMMAND_ID_MAP_SNIFFER = {
-  'sniffer_capture_dump'      => COMMAND_ID_START_SNIFFER + 1,
-  'sniffer_capture_dump_read' => COMMAND_ID_START_SNIFFER + 2,
-  'sniffer_capture_release'   => COMMAND_ID_START_SNIFFER + 3,
-  'sniffer_capture_start'     => COMMAND_ID_START_SNIFFER + 4,
-  'sniffer_capture_stats'     => COMMAND_ID_START_SNIFFER + 5,
-  'sniffer_capture_stop'      => COMMAND_ID_START_SNIFFER + 6,
-  'sniffer_interfaces'        => COMMAND_ID_START_SNIFFER + 7,
-  }
-
-COMMAND_ID_MAP_UNHOOK = {
-  'unhook_pe' => COMMAND_ID_START_UNHOOK + 1,
-}
-
-COMMAND_ID_MAP = [
-  COMMAND_ID_MAP_CORE,
-  COMMAND_ID_MAP_STDAPI,
-  COMMAND_ID_MAP_PRIV,
-  COMMAND_ID_MAP_EXTAPI,
-  COMMAND_ID_MAP_SNIFFER,
-  COMMAND_ID_MAP_ANDROID,
-  COMMAND_ID_MAP_NETWORKPUG,
-  COMMAND_ID_MAP_WINPMEM,
-  COMMAND_ID_MAP_KIWI,
-  COMMAND_ID_MAP_APPAPI,
-  COMMAND_ID_MAP_UNHOOK,
-  COMMAND_ID_MAP_ESPIA,
-  COMMAND_ID_MAP_INCOGNITO,
-  COMMAND_ID_MAP_PYTHON,
-  COMMAND_ID_MAP_POWERSHELL,
-  COMMAND_ID_MAP_LANATTACKS,
-  COMMAND_ID_MAP_PEINJECTOR,
-  COMMAND_ID_MAP_MIMIKATZ,
-].inject({}) {|m1, m2| m1.merge(m2)}
-
 def self.generate_command_id_map_c
-  id_map = [
-    COMMAND_ID_MAP_CORE,
-    COMMAND_ID_MAP_STDAPI,
-    COMMAND_ID_MAP_PRIV,
-    COMMAND_ID_MAP_EXTAPI,
-    COMMAND_ID_MAP_SNIFFER,
-    COMMAND_ID_MAP_WINPMEM,
-    COMMAND_ID_MAP_KIWI,
-    COMMAND_ID_MAP_UNHOOK,
-    COMMAND_ID_MAP_ESPIA,
-    COMMAND_ID_MAP_INCOGNITO,
-    COMMAND_ID_MAP_PYTHON,
-    COMMAND_ID_MAP_POWERSHELL,
-    COMMAND_ID_MAP_LANATTACKS,
-    COMMAND_ID_MAP_PEINJECTOR,
-    COMMAND_ID_MAP_MIMIKATZ,
-  ].inject({}) {|m1, m2| m1.merge(m2)}
+  id_map = CommandMapper.get_commands(*%w{
+    core
+    stdapi
+    priv
+    extapi
+    sniffer
+    winpmem
+    kiwi
+    unhook
+    espia
+    incognito
+    python
+    powershell
+    lanattacks
+    peinjector
+  })
 
   command_ids = id_map.map {|k, v| "#define COMMAND_ID_#{k.upcase} #{v}"}
   %Q^
 /*!
  * @file common_command_ids.h
  * @brief Declarations of command ID values
- * @description This file was generated #{Time.now.utc}. Do not modify directly.
+ * @description This file was generated #{::Time.now.utc}. Do not modify directly.
  */
 #ifndef _METERPRETER_SOURCE_COMMON_COMMAND_IDS_H
 #define _METERPRETER_SOURCE_COMMON_COMMAND_IDS_H
@@ -493,10 +200,7 @@ def self.generate_command_id_map_c
 end
 
 def self.generate_command_id_map_java
-  id_map = [
-    COMMAND_ID_MAP_CORE,
-    COMMAND_ID_MAP_STDAPI,
-  ].inject({}) {|m1, m2| m1.merge(m2)}
+  id_map = CommandMapper.get_commands(*%w{ core stdapi })
   command_ids = id_map.map {|k, v| "    public static final int #{k.upcase} = #{v};"}
   %Q^
 package com.metasploit.meterpreter.command;
@@ -504,7 +208,7 @@ package com.metasploit.meterpreter.command;
 /**
  * All supported Command Identifiers
  *
- * @author Genereated by a tool @ #{Time.now.utc}
+ * @author Generated by a tool @ #{::Time.now.utc}
  */
 public interface CommandId {
 #{command_ids.join("\n")}
@@ -516,7 +220,7 @@ def self.generate_command_id_map_php_lib(lib, id_map)
   command_ids = id_map.map {|k, v| "define('COMMAND_ID_#{k.upcase}', #{v});"}
   %Q^
 # ---------------------------------------------------------------
-# --- THIS CONTENT WAS GENERATED BY A TOOL @ #{Time.now.utc}
+# --- THIS CONTENT WAS GENERATED BY A TOOL @ #{::Time.now.utc}
 # IDs for #{lib}
 #{command_ids.join("\n")}
 # ---------------------------------------------------------------
@@ -525,21 +229,18 @@ end
 
 def self.generate_command_id_map_php
   %Q^
-#{self.generate_command_id_map_php_lib('metsrv', COMMAND_ID_MAP_CORE)}
+#{self.generate_command_id_map_php_lib('metsrv', CommandMapper.get_commands('core'))}
 
-#{self.generate_command_id_map_php_lib('stdapi', COMMAND_ID_MAP_STDAPI)}
+#{self.generate_command_id_map_php_lib('stdapi', CommandMapper.get_commands('stdapi'))}
   ^
 end
 
 def self.generate_command_id_map_python
-  id_map = [
-    COMMAND_ID_MAP_CORE,
-    COMMAND_ID_MAP_STDAPI,
-  ].inject({}) {|m1, m2| m1.merge(m2)}
+  id_map = CommandMapper.get_commands(*%w{ core stdapi })
   command_ids = id_map.map {|k, v| "    (#{v}, '#{k.downcase}'),"}
   %Q^
 # ---------------------------------------------------------------
-# --- THIS CONTENT WAS GENERATED BY A TOOL @ #{Time.now.utc}
+# --- THIS CONTENT WAS GENERATED BY A TOOL @ #{::Time.now.utc}
 COMMAND_IDS = (
 #{command_ids.join("\n")}
 )
@@ -548,27 +249,26 @@ COMMAND_IDS = (
 end
 
 def self.generate_command_id_map_python_extension
-  id_map = [
-    COMMAND_ID_MAP_CORE,
-    COMMAND_ID_MAP_STDAPI,
-    COMMAND_ID_MAP_PRIV,
-    COMMAND_ID_MAP_EXTAPI,
-    COMMAND_ID_MAP_SNIFFER,
-    COMMAND_ID_MAP_WINPMEM,
-    COMMAND_ID_MAP_KIWI,
-    COMMAND_ID_MAP_UNHOOK,
-    COMMAND_ID_MAP_ESPIA,
-    COMMAND_ID_MAP_INCOGNITO,
-    COMMAND_ID_MAP_PYTHON,
-    COMMAND_ID_MAP_POWERSHELL,
-    COMMAND_ID_MAP_LANATTACKS,
-    COMMAND_ID_MAP_PEINJECTOR,
-    COMMAND_ID_MAP_MIMIKATZ,
-  ].inject({}) {|m1, m2| m1.merge(m2)}
+  id_map = CommandMapper.get_commands(*%w{
+    core
+    stdapi
+    priv
+    extapi
+    sniffer
+    winpmem
+    kiwi
+    unhook
+    espia
+    incognito
+    python
+    powershell
+    lanattacks
+    peinjector
+  })
   command_ids = id_map.map {|k, v| "COMMAND_ID_#{k.upcase} = #{v}"}
   %Q^
 # ---------------------------------------------------------------
-# --- THIS CONTENT WAS GENERATED BY A TOOL @ #{Time.now.utc}
+# --- THIS CONTENT WAS GENERATED BY A TOOL @ #{::Time.now.utc}
 
 #{command_ids.join("\n")}
 
@@ -577,27 +277,26 @@ def self.generate_command_id_map_python_extension
 end
 
 def self.generate_command_id_map_csharp
-  id_map = [
-    COMMAND_ID_MAP_CORE,
-    COMMAND_ID_MAP_STDAPI,
-    COMMAND_ID_MAP_PRIV,
-    COMMAND_ID_MAP_EXTAPI,
-    COMMAND_ID_MAP_SNIFFER,
-    COMMAND_ID_MAP_WINPMEM,
-    COMMAND_ID_MAP_KIWI,
-    COMMAND_ID_MAP_UNHOOK,
-    COMMAND_ID_MAP_ESPIA,
-    COMMAND_ID_MAP_INCOGNITO,
-    COMMAND_ID_MAP_PYTHON,
-    COMMAND_ID_MAP_POWERSHELL,
-    COMMAND_ID_MAP_LANATTACKS,
-    COMMAND_ID_MAP_PEINJECTOR,
-    COMMAND_ID_MAP_MIMIKATZ,
-  ].inject({}) {|m1, m2| m1.merge(m2)}
+  id_map = CommandMapper.get_commands(*%w{
+    core
+    stdapi
+    priv
+    extapi
+    sniffer
+    winpmem
+    kiwi
+    unhook
+    espia
+    incognito
+    python
+    powershell
+    lanattacks
+    peinjector
+  })
   command_ids = id_map.map {|k, v| "#{k.split('_').map(&:capitalize).join} = #{v},"}
   %Q^
 /// <summary>
-// This content was generated by a tool @ #{Time.now.utc}
+// This content was generated by a tool @ #{::Time.now.utc}
 /// </summary>
 namespace MSF.Powershell.Meterpreter
 {
@@ -608,25 +307,6 @@ namespace MSF.Powershell.Meterpreter
 }
   ^
 end
-
-def self.method_string_to_command_id(method_string)
-  unless COMMAND_ID_MAP.include?(method_string)
-    raise ArgumentError, "Unknown Packet command method string: #{method_string}, please report this to the Metasploit team."
-  end
-
-  COMMAND_ID_MAP[method_string]
-end
-
-def self.command_id_to_method_string(method_int)
-  value = COMMAND_ID_MAP.key(method_int)
-
-  if value.nil?
-    raise ArgumentError, "Unknown Packet command method integer: #{}, please report this to the Metasploit team."
-  end
-
-  value
-end
-
 
 ###
 #
@@ -664,6 +344,22 @@ class Tlv
     end
   end
 
+  def _tlv_type_string(value)
+    tlv_names = ::Rex::Post::Meterpreter::CommandMapper.get_tlv_names(value).map { |name| name.to_s.gsub('TLV_TYPE_', '').gsub('PACKET_TYPE_', '') }
+
+    case tlv_names.length
+    when 0
+      "unknown-#{value}"
+    when 1
+      tlv_names.first
+    else
+      # In the off-chance we have multiple TLV types which have the same value
+      # https://github.com/rapid7/metasploit-framework/issues/16267
+      # Sort it to ensure consistency across tests
+      "oneOf(#{tlv_names.sort_by(&:to_s).join(',')})"
+    end
+  end
+
   def inspect
     utype = type ^ TLV_META_TYPE_COMPRESSED
     group = false
@@ -677,83 +373,58 @@ class Tlv
       when TLV_META_TYPE_COMPLEX; "COMPLEX"
       else; 'unknown-meta-type'
       end
+
     stype = case type
-      when PACKET_TYPE_REQUEST; "Request"
-      when PACKET_TYPE_RESPONSE; "Response"
-      when TLV_TYPE_REQUEST_ID; "REQUEST-ID"
-      when TLV_TYPE_COMMAND_ID; "COMMAND-ID"
-      when TLV_TYPE_RESULT; "RESULT"
-      when TLV_TYPE_EXCEPTION; "EXCEPTION"
-      when TLV_TYPE_STRING; "STRING"
-      when TLV_TYPE_UINT; "UINT"
-      when TLV_TYPE_BOOL; "BOOL"
-
-      when TLV_TYPE_LENGTH; "LENGTH"
-      when TLV_TYPE_DATA; "DATA"
-      when TLV_TYPE_FLAGS; "FLAGS"
-
-      when TLV_TYPE_CHANNEL_ID; "CHANNEL-ID"
-      when TLV_TYPE_CHANNEL_TYPE; "CHANNEL-TYPE"
-      when TLV_TYPE_CHANNEL_DATA; "CHANNEL-DATA"
-      when TLV_TYPE_CHANNEL_DATA_GROUP; "CHANNEL-DATA-GROUP"
-      when TLV_TYPE_CHANNEL_CLASS; "CHANNEL-CLASS"
-      when TLV_TYPE_CHANNEL_PARENTID; "CHANNEL-PARENTID"
-
-      when TLV_TYPE_SEEK_WHENCE; "SEEK-WHENCE"
-      when TLV_TYPE_SEEK_OFFSET; "SEEK-OFFSET"
-      when TLV_TYPE_SEEK_POS; "SEEK-POS"
-
-      when TLV_TYPE_EXCEPTION_CODE; "EXCEPTION-CODE"
-      when TLV_TYPE_EXCEPTION_STRING; "EXCEPTION-STRING"
-
-      when TLV_TYPE_LIBRARY_PATH; "LIBRARY-PATH"
-      when TLV_TYPE_TARGET_PATH; "TARGET-PATH"
-      when TLV_TYPE_MIGRATE_PID; "MIGRATE-PID"
-      when TLV_TYPE_MIGRATE_PAYLOAD; "MIGRATE-PAYLOAD"
-      when TLV_TYPE_MIGRATE_ARCH; "MIGRATE-ARCH"
-      when TLV_TYPE_MIGRATE_BASE_ADDR; "MIGRATE-BASE-ADDR"
-      when TLV_TYPE_MIGRATE_ENTRY_POINT; "MIGRATE-ENTRY-POINT"
-      when TLV_TYPE_MIGRATE_STUB; "MIGRATE-STUB"
-      when TLV_TYPE_MIGRATE_SOCKET_PATH; "MIGRATE-SOCKET-PATH"
-      when TLV_TYPE_LIB_LOADER_NAME; "LIB-LOADER-NAME"
-      when TLV_TYPE_LIB_LOADER_ORDINAL; "LIB-LOADER-ORDINAL"
-      when TLV_TYPE_TRANS_TYPE; "TRANS-TYPE"
-      when TLV_TYPE_TRANS_URL; "TRANS-URL"
-      when TLV_TYPE_TRANS_COMM_TIMEOUT; "TRANS-COMM-TIMEOUT"
-      when TLV_TYPE_TRANS_SESSION_EXP; "TRANS-SESSION-EXP"
-      when TLV_TYPE_TRANS_CERT_HASH; "TRANS-CERT-HASH"
-      when TLV_TYPE_TRANS_PROXY_HOST; "TRANS-PROXY-HOST"
-      when TLV_TYPE_TRANS_PROXY_USER; "TRANS-PROXY-USER"
-      when TLV_TYPE_TRANS_PROXY_PASS; "TRANS-PROXY-PASS"
-      when TLV_TYPE_TRANS_RETRY_TOTAL; "TRANS-RETRY-TOTAL"
-      when TLV_TYPE_TRANS_RETRY_WAIT; "TRANS-RETRY-WAIT"
-      when TLV_TYPE_MACHINE_ID; "MACHINE-ID"
-      when TLV_TYPE_UUID; "UUID"
-      when TLV_TYPE_SESSION_GUID; "SESSION-GUID"
-      when TLV_TYPE_RSA_PUB_KEY; "RSA-PUB-KEY"
-      when TLV_TYPE_SYM_KEY_TYPE; "SYM-KEY-TYPE"
-      when TLV_TYPE_SYM_KEY; "SYM-KEY"
-      when TLV_TYPE_ENC_SYM_KEY; "ENC-SYM-KEY"
-
-      when TLV_TYPE_PIVOT_ID; "PIVOT-ID"
-      when TLV_TYPE_PIVOT_STAGE_DATA; "PIVOT-STAGE-DATA"
-      when TLV_TYPE_PIVOT_NAMED_PIPE_NAME; "PIVOT-NAMED-PIPE-NAME"
-
-      else; "unknown-#{type}"
+      when PACKET_TYPE_REQUEST; 'Request'
+      when PACKET_TYPE_RESPONSE; 'Response'
+      else; _tlv_type_string(type)
       end
-    val = value.inspect
-    if val.length > 50
-      val = val[0,50] + ' ..."'
-    end
+
     group ||= (self.class.to_s =~ /Packet/)
     if group
+      has_command_ids = type == PACKET_TYPE_RESPONSE && (self.method == COMMAND_ID_CORE_ENUMEXTCMD || self.method == COMMAND_ID_CORE_LOADLIB)
+      if has_command_ids
+        longest_command_id = self.get_tlvs(TLV_TYPE_UINT).map(&:value).max
+        longest_command_id_length = longest_command_id.to_s.length
+      end
+
       tlvs_inspect = "tlvs=[\n"
       @tlvs.each { |t|
-        tlvs_inspect << "  #{t.inspect}\n"
+        if t.type == TLV_TYPE_UINT && has_command_ids && longest_command_id_length
+          command_name = ::Rex::Post::Meterpreter::CommandMapper.get_command_name(t.value)
+          command_output = "command=#{command_name}>\n"
+          this_value_length = t.value.to_s.length
+          adjusted_command_name = command_output.rjust(command_output.length + longest_command_id_length - this_value_length)
+          tlvs_inspect << "  #{t.inspect.gsub(/>$/, '')} " << adjusted_command_name
+        else
+          tlvs_inspect << "  #{t.inspect}\n"
+        end
       }
       tlvs_inspect << "]"
     else
+      val = value.inspect
+      # Known list of datatypes that shouldn't be truncated, as their values are useful when debugging
+      is_val_truncation_allowed = ![
+        Rex::Post::Meterpreter::TLV_TYPE_UUID,
+        Rex::Post::Meterpreter::Extensions::Priv::TLV_TYPE_FS_FILE_PATH,
+        Rex::Post::Meterpreter::Extensions::Priv::TLV_TYPE_FS_SRC_FILE_PATH,
+        Rex::Post::Meterpreter::Extensions::Stdapi::TLV_TYPE_FILE_PATH,
+        Rex::Post::Meterpreter::Extensions::Stdapi::TLV_TYPE_DIRECTORY_PATH,
+        Rex::Post::Meterpreter::Extensions::Stdapi::TLV_TYPE_STAT_BUF,
+        Rex::Post::Meterpreter::Extensions::Stdapi::TLV_TYPE_PROCESS_PATH,
+      ].include?(type)
+      if is_val_truncation_allowed && val.length > 50
+        val = val[0,50] + ' ..."'
+      end
       tlvs_inspect = "meta=#{meta.ljust(10)} value=#{val}"
+      if type == TLV_TYPE_COMMAND_ID
+        begin
+          command_name = ::Rex::Post::Meterpreter::CommandMapper.get_command_name(value)
+        rescue
+          command_name = nil
+        end
+        tlvs_inspect <<= " command=#{command_name || 'unknown'}"
+      end
     end
     "#<#{self.class} type=#{stype.ljust(15)} #{tlvs_inspect}>"
   end
@@ -818,7 +489,7 @@ class Tlv
       # compress the raw data
       raw_compressed = Rex::Text.zlib_deflate( raw_uncompressed )
       # check we have actually made the raw data smaller...
-      # (small blobs often compress slightly larger then the origional)
+      # (small blobs often compress slightly larger then the original)
       # if the compressed data is not smaller, we dont use the compressed data
       if( raw_compressed.length < raw_uncompressed.length )
         # if so, set the TLV's type to indicate compression is used
@@ -845,7 +516,7 @@ class Tlv
       # set this TLV as using compression
       @compress = true
       # remove the TLV_META_TYPE_COMPRESSED flag from the tlv type to restore the
-      # tlv type to its origional, allowing for transparent data compression.
+      # tlv type to its original, allowing for transparent data compression.
       self.type = self.type ^ TLV_META_TYPE_COMPRESSED
       # decompress the compressed data (skipping the length and type DWORD's)
       raw_decompressed = Rex::Text.zlib_inflate( raw[HEADER_SIZE..length-1] )
@@ -1175,6 +846,10 @@ class Packet < GroupTlv
   #
   ##
 
+  def Packet.create_config()
+    Packet.new(PACKET_TYPE_CONFIG)
+  end
+
   #
   # Creates a request with the supplied method.
   #
@@ -1308,7 +983,7 @@ class Packet < GroupTlv
     raw = (session_guid || NULL_GUID).dup
     tlv_data = GroupTlv.instance_method(:to_r).bind(self).call
 
-    if key && key[:key] && (key[:type] == ENC_FLAG_AES128 || key[:type] == ENC_FLAG_AES256)
+    if @type != PACKET_TYPE_CONFIG && key && key[:key] && (key[:type] == ENC_FLAG_AES128 || key[:type] == ENC_FLAG_AES256)
       # encrypt the data, but not include the length and type
       iv, ciphertext = aes_encrypt(key[:key], tlv_data[HEADER_SIZE..-1])
       # now manually add the length/type/iv/ciphertext
@@ -1443,4 +1118,3 @@ end
 
 
 end; end; end
-

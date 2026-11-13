@@ -1,6 +1,6 @@
 # -*- coding: binary -*-
 
-# require 'rex/io/socket_abstraction'
+require 'rex/post/channel'
 require 'rex/post/meterpreter/channel'
 
 module Rex
@@ -18,45 +18,7 @@ module Meterpreter
 ###
 module SocketAbstraction
 
-  module SocketInterface
-    include Rex::Socket
-
-    def getsockname
-      return super if not channel
-      # Find the first host in our chain (our address)
-      hops = 0
-      csock = channel.client.sock
-      while(csock.respond_to?('channel'))
-        csock = csock.channel.client.sock
-        hops += 1
-      end
-      _address_family,caddr,_cport = csock.getsockname
-      address_family,raddr,_rport = csock.getpeername_as_array
-      _maddr,mport = [ channel.params.localhost, channel.params.localport ]
-      [ address_family, "#{caddr}#{(hops > 0) ? "-_#{hops}_" : ""}-#{raddr}", mport ]
-    end
-
-    def getpeername
-      return super if not channel
-      maddr,mport = [ channel.params.peerhost, channel.params.peerport ]
-      ::Socket.sockaddr_in(mport, maddr)
-    end
-
-    %i{localhost localport peerhost peerport}.map do |meth|
-      define_method(meth) {
-        return super if not channel
-        channel.params.send(meth)
-      }
-    end
-
-    def close
-      super
-      channel.cleanup_abstraction
-      channel.close
-    end
-
-    attr_accessor :channel
-  end
+  include Rex::Post::Channel::SocketAbstraction
 
   #
   # Simple mixin for lsock in order to help avoid a ruby interpreter issue with ::Socket.pair
@@ -112,15 +74,6 @@ module SocketAbstraction
     else
       return false
     end
-  end
-
-  #
-  # Performs a close operation on the right side of the local stream.
-  #
-  def dio_close_handler(packet)
-    rsock.close
-
-    return super(packet)
   end
 
   #

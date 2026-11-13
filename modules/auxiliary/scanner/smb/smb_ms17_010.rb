@@ -13,27 +13,27 @@ class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::Report
 
   def initialize(info = {})
-    super(update_info(info,
-      'Name'           => 'MS17-010 SMB RCE Detection',
-      'Description'    => %q{
-        Uses information disclosure to determine if MS17-010 has been patched or not.
-        Specifically, it connects to the IPC$ tree and attempts a transaction on FID 0.
-        If the status returned is "STATUS_INSUFF_SERVER_RESOURCES", the machine does
-        not have the MS17-010 patch.
+    super(
+      update_info(
+        info,
+        'Name' => 'MS17-010 SMB RCE Detection',
+        'Description' => %q{
+          Uses information disclosure to determine if MS17-010 has been patched or not.
+          Specifically, it connects to the IPC$ tree and attempts a transaction on FID 0.
+          If the status returned is "STATUS_INSUFF_SERVER_RESOURCES", the machine does
+          not have the MS17-010 patch.
 
-        If the machine is missing the MS17-010 patch, the module will check for an
-        existing DoublePulsar (ring 0 shellcode/malware) infection.
+          If the machine is missing the MS17-010 patch, the module will check for an
+          existing DoublePulsar (ring 0 shellcode/malware) infection.
 
-        This module does not require valid SMB credentials in default server
-        configurations. It can log on as the user "\" and connect to IPC$.
-      },
-      'Author'         =>
-          [
-            'Sean Dillon <sean.dillon@risksense.com>', # @zerosum0x0
-            'Luke Jennings' # DoublePulsar detection Python code
-          ],
-      'References'     =>
-        [
+          This module does not require valid SMB credentials in default server
+          configurations. It can log on as the user "\" and connect to IPC$.
+        },
+        'Author' => [
+          'Sean Dillon <sean.dillon@risksense.com>', # @zerosum0x0
+          'Luke Jennings' # DoublePulsar detection Python code
+        ],
+        'References' => [
           [ 'CVE', '2017-0143'],
           [ 'CVE', '2017-0144'],
           [ 'CVE', '2017-0145'],
@@ -43,30 +43,34 @@ class MetasploitModule < Msf::Auxiliary
           [ 'MSB', 'MS17-010'],
           [ 'URL', 'https://zerosum0x0.blogspot.com/2017/04/doublepulsar-initial-smb-backdoor-ring.html'],
           [ 'URL', 'https://github.com/countercept/doublepulsar-detection-script'],
-          [ 'URL', 'https://technet.microsoft.com/en-us/library/security/ms17-010.aspx']
+          [ 'URL', 'https://web.archive.org/web/20170513050203/https://technet.microsoft.com/en-us/library/security/ms17-010.aspx']
         ],
-      'License'        => MSF_LICENSE,
-      'Notes' =>
-          {
-              'AKA' => [
-                  'DOUBLEPULSAR',
-                  'ETERNALBLUE'
-              ]
-          }
-    ))
+        'License' => MSF_LICENSE,
+        'Notes' => {
+          'AKA' => [
+            'DOUBLEPULSAR',
+            'ETERNALBLUE'
+          ],
+          'Stability' => UNKNOWN_STABILITY,
+          'Reliability' => UNKNOWN_RELIABILITY,
+          'SideEffects' => UNKNOWN_SIDE_EFFECTS
+        }
+      )
+    )
 
     register_options(
       [
         OptBool.new('CHECK_DOPU', [false, 'Check for DOUBLEPULSAR on vulnerable hosts', true]),
         OptBool.new('CHECK_ARCH', [false, 'Check for architecture on vulnerable hosts', true]),
         OptBool.new('CHECK_PIPE', [false, 'Check for named pipe on vulnerable hosts', false])
-      ])
+      ]
+    )
   end
 
   # algorithm to calculate the XOR Key for DoublePulsar knocks
   def calculate_doublepulsar_xor_key(s)
     x = (2 * s ^ (((s & 0xff00 | (s << 16)) << 8) | (((s >> 16) | s & 0xff0000) >> 8)))
-    x & 0xffffffff  # this line was added just to truncate to 32 bits
+    x & 0xffffffff # this line was added just to truncate to 32 bits
   end
 
   # The arch is adjacent to the XOR key in the SMB signature
@@ -74,8 +78,13 @@ class MetasploitModule < Msf::Auxiliary
     s == 0 ? 'x86 (32-bit)' : 'x64 (64-bit)'
   end
 
+  def check_host(ip)
+    run_host(ip)
+  end
+
   def run_host(ip)
     checkcode = Exploit::CheckCode::Unknown
+    details = {}
 
     begin
       ipc_share = "\\\\#{ip}\\IPC$"
@@ -86,28 +95,31 @@ class MetasploitModule < Msf::Auxiliary
       status = do_smb_ms17_010_probe(tree_id)
       vprint_status("Received #{status} with FID = 0")
 
-      if status == "STATUS_INSUFF_SERVER_RESOURCES"
-        os = simple.client.peer_native_os
-
+      os = simple.client.peer_native_os.dup
+      details[:os] = os.dup
+      if status == 'STATUS_INSUFF_SERVER_RESOURCES'
         if datastore['CHECK_ARCH']
           case dcerpc_getarch
           when ARCH_X86
             os << ' x86 (32-bit)'
+            details[:arch] = ARCH_X86
           when ARCH_X64
             os << ' x64 (64-bit)'
+            details[:arch] = ARCH_X64
           end
         end
 
         print_good("Host is likely VULNERABLE to MS17-010! - #{os}")
 
-        checkcode = Exploit::CheckCode::Vulnerable
+        checkcode = Exploit::CheckCode::Vulnerable(details: details)
 
         report_vuln(
           host: ip,
           port: rport, # A service is necessary for the analyze command
           name: self.name,
           refs: self.references,
-          info: "STATUS_INSUFF_SERVER_RESOURCES for FID 0 against IPC$ - #{os}"
+          info: "STATUS_INSUFF_SERVER_RESOURCES for FID 0 against IPC$ - #{os}",
+          check_code: checkcode
         )
 
         # vulnerable to MS17-010, check for DoublePulsar infection
@@ -129,19 +141,18 @@ class MetasploitModule < Msf::Auxiliary
 
         if datastore['CHECK_PIPE']
           pipe_name, _ = check_named_pipes(return_first: true)
+          if pipe_name
+            print_good("Named pipe found: #{pipe_name}")
 
-          return unless pipe_name
-
-          print_good("Named pipe found: #{pipe_name}")
-
-          report_note(
-            host:  ip,
-            port:  rport,
-            proto: 'tcp',
-            sname: 'smb',
-            type:  'MS17-010 Named Pipe',
-            data:  pipe_name
-          )
+            report_note(
+              host: ip,
+              port: rport,
+              proto: 'tcp',
+              sname: 'smb',
+              type: 'MS17-010 Named Pipe',
+              data: { :pipe_name => pipe_name }
+            )
+          end
         end
       elsif status == "STATUS_ACCESS_DENIED" or status == "STATUS_INVALID_HANDLE"
         # STATUS_ACCESS_DENIED (Windows 10) and STATUS_INVALID_HANDLE (others)
@@ -150,13 +161,22 @@ class MetasploitModule < Msf::Auxiliary
         print_error("Unable to properly detect if host is vulnerable.")
       end
 
+      unless (fp_match = Recog::Nizer.match('smb.native_os', simple.client.peer_native_os)).nil?
+        report_host(
+          host: rhost,
+          arch: details[:arch],
+          os_family: 'Windows',
+          os_flavor: fp_match['os.edition'],
+          os_name: fp_match['os.product']
+        )
+      end
     rescue ::Interrupt
       print_status("Exiting on interrupt.")
       raise $!
     rescue ::Rex::Proto::SMB::Exceptions::LoginError
       print_error("An SMB Login Error occurred while connecting to the IPC$ tree.")
     rescue ::Exception => e
-      vprint_error("#{e.class}: #{e.message}")
+      print_error("#{e.class}: #{e.message}")
     ensure
       disconnect
     end
@@ -216,7 +236,7 @@ class MetasploitModule < Msf::Auxiliary
 
     # opcode 0x0e = SESSION_SETUP
     setup = "\x0e\x00\x00\x00"
-    setup_count = 1             # 1 word
+    setup_count = 1 # 1 word
     trans = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 
     # calculate offsets to the SetupData payload
@@ -253,7 +273,7 @@ class MetasploitModule < Msf::Auxiliary
 
     # opcode 0x23 = PeekNamedPipe, fid = 0
     setup = "\x23\x00\x00\x00"
-    setup_count = 2             # 2 words
+    setup_count = 2 # 2 words
     trans = "\\PIPE\\\x00"
 
     # calculate offsets to the SetupData payload

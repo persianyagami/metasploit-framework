@@ -3,8 +3,6 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/auxiliary/brocade'
-
 class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::Brocade
   include Msf::Exploit::Deprecated
@@ -19,7 +17,12 @@ class MetasploitModule < Msf::Auxiliary
           This module imports a Brocade device configuration.
         },
         'License' => MSF_LICENSE,
-        'Author' => [ 'h00die']
+        'Author' => ['h00die'],
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [],
+          'Reliability' => []
+        }
       )
     )
 
@@ -30,12 +33,11 @@ class MetasploitModule < Msf::Auxiliary
         Opt::RPORT(22)
       ]
     )
-
   end
 
   def run
     unless ::File.exist?(datastore['CONFIG'])
-      fail_with Failure::BadConfig, "Brocade config file #{datastore['CONFIG']} does not exists!"
+      fail_with Failure::BadConfig, "Brocade config file #{datastore['CONFIG']} does not exist!"
     end
     brocade_config = ::File.open(datastore['CONFIG'], 'rb')
     print_status('Importing config')

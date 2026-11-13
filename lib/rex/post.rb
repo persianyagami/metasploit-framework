@@ -1,10 +1,13 @@
 # -*- coding: binary -*-
 
-# General independent containers
-require 'rex/post/permission'
-
 # Post-exploitation clients
 require 'rex/post/meterpreter'
+require 'rex/post/smb'
+require 'rex/post/postgresql'
+require 'rex/post/mysql'
+require 'rex/post/mssql'
 
-# Hardware Bridge clients
-require 'rex/post/hwbridge'
+module Rex::Post
+
+end
+include Rex::Post::Permission

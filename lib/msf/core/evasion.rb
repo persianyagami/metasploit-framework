@@ -1,4 +1,3 @@
-require 'msf/core/module'
 
 module Msf
   class Evasion < Msf::Module
@@ -98,12 +97,17 @@ module Msf
     # Returns whether the requested payload is compatible with the module
     #
     # @param [String] name The payload name
-    # @param [TrueClass] Payload is compatible.
-    # @param [FlaseClass] Payload is not compatible.
+    # @return [Boolean] True if the payload is compatible, False if not.
     def is_payload_compatible?(name)
       p = framework.payloads[name]
+      return false unless p
 
-      pi = p.new
+      begin
+        pi = p.new
+      rescue ::Exception, ::LoadError => e
+        wlog("Module #{name} failed to initialize payload when checking evasion compatibility: #{e}", 'core', LEV_0)
+        return false
+      end
 
       # Are we compatible in terms of conventions and connections and
       # what not?
@@ -219,13 +223,14 @@ module Msf
       reqs = self.payload_info.dup
 
       # Pass save register requirements to the NOP generator
-      reqs['Space']           = payload_info['Space'].to_i
+      reqs['Space']           = payload_info['Space'] ? payload_info['Space'].to_i : nil
       reqs['SaveRegisters']   = module_info['SaveRegisters']
       reqs['Prepend']         = payload_info['Prepend']
       reqs['PrependEncoder']  = payload_info['PrependEncoder']
       reqs['BadChars']        = payload_info['BadChars']
       reqs['Append']          = payload_info['Append']
       reqs['AppendEncoder']   = payload_info['AppendEncoder']
+      reqs['DisableNops']     = payload_info['DisableNops']
       reqs['MaxNops']         = payload_info['MaxNops']
       reqs['MinNops']         = payload_info['MinNops']
       reqs['Encoder']         = datastore['ENCODER'] || payload_info['Encoder']
@@ -233,6 +238,7 @@ module Msf
       reqs['EncoderType']     = payload_info['EncoderType']
       reqs['EncoderOptions']  = payload_info['EncoderOptions']
       reqs['ExtendedOptions'] = payload_info['ExtendedOptions']
+      reqs['ForceEncode']     = payload_info['ForceEncode']
       reqs['Evasion']         = self
 
       # Pass along the encoder don't fall through flag

@@ -1,4 +1,3 @@
-require 'rex/parser/nexpose_simple_nokogiri'
 
 module Msf::DBManager::Import::Nexpose::Simple
   def import_nexpose_noko_stream(args, &block)
@@ -66,10 +65,10 @@ module Msf::DBManager::Import::Nexpose::Simple
         :task      => args[:task]
       }
 
-      host = report_host(conf)
+      host = msf_import_host(conf)
       report_import_note(wspace, host)
 
-      report_note(
+      msf_import_note(
         :workspace => wspace,
         :host      => host,
         :type      => 'host.os.nexpose_fingerprint',
@@ -107,7 +106,7 @@ module Msf::DBManager::Import::Nexpose::Simple
         end
 
         if(sname.downcase != '<unknown>')
-          report_service(
+          msf_import_service(
               :workspace => wspace,
               :host      => host,
               :proto     => sprot,
@@ -117,7 +116,7 @@ module Msf::DBManager::Import::Nexpose::Simple
               :task      => args[:task]
           )
         else
-          report_service(
+          msf_import_service(
               :workspace => wspace,
               :host      => host,
               :proto     => sprot,
@@ -132,7 +131,7 @@ module Msf::DBManager::Import::Nexpose::Simple
           vid  = vuln.attributes['id'].to_s.downcase
           refs = process_nexpose_data_sxml_refs(vuln)
           next if not refs
-          report_vuln(
+          msf_import_vuln(
               :workspace => wspace,
               :host      => host,
               :port      => sport,

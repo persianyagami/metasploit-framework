@@ -3,9 +3,6 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'rex/parser/netsarang'
-require 'msf/core/auxiliary/report'
-
 class MetasploitModule < Msf::Post
   include Msf::Post::Windows::UserProfiles
   include Msf::Post::File
@@ -30,7 +27,21 @@ class MetasploitModule < Msf::Post
           'Kali-Team <kali-team[at]qq.com>'
         ],
         'Platform' => [ 'win' ],
-        'SessionTypes' => [ 'meterpreter' ]
+        'SessionTypes' => [ 'meterpreter' ],
+        'Compat' => {
+          'Meterpreter' => {
+            'Commands' => %w[
+              stdapi_fs_search
+              stdapi_fs_separator
+              stdapi_fs_stat
+            ]
+          }
+        },
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [IOC_IN_LOGS],
+          'Reliability' => []
+        }
       )
     )
     register_options(
@@ -44,18 +55,18 @@ class MetasploitModule < Msf::Post
     # version 6.0 The character set of the session file will use Unicode
     # version <= 5.3 The character set of the session file will use ANSI
     if data[0].unpack('C') == [255] && data[1].unpack('C') == [254]
-      data[2..-1].force_encoding('UTF-16LE').encode('UTF-8')
+      data[2..].force_encoding('UTF-16LE').encode('UTF-8')
     elsif data[0].unpack('C') == [254] && data[1].unpack('C') == [187] && data[2].unpack('C') == [191]
       data
     elsif data[0].unpack('C') == [254] && data[1].unpack('C') == [255]
-      data[2..-1].force_encoding('UTF-16BE').encode('UTF-8')
+      data[2..].force_encoding('UTF-16BE').encode('UTF-8')
     else
       data
     end
   end
 
   def enable_master_passwd?(version_6_path)
-    file_name = expand_path(version_6_path + '\\Common\\MasterPassword.mpw')
+    file_name = expand_path("#{version_6_path}\\Common\\MasterPassword.mpw")
     file_contents = read_file(file_name) if session.fs.file.exist?(file_name)
     if file_contents.nil? || file_contents.empty?
       return false

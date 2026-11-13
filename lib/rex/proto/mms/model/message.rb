@@ -1,4 +1,5 @@
 # -*- coding: binary -*-
+require 'rex/mime/message'
 
 module Rex
   module Proto
@@ -96,7 +97,7 @@ module Rex
             mms << "Subject: #{self.subject}\n"
             mms << "Content-Type: multipart/mixed; boundary=#{body.bound}\n"
             mms << "\n"
-            mms << body.to_s.gsub(/\-\-\r\n\r\n\-\-_/, "--\n--_")
+            mms << body.to_s.gsub("--\r\n\r\n--_", "--\n--_")
 
             mms
           end

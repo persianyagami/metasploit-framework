@@ -3,7 +3,7 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/exploit/dns'
+require 'public_suffix'
 
 class MetasploitModule < Msf::Auxiliary
   include Msf::Exploit::Remote::DNS::Enumeration
@@ -22,12 +22,13 @@ class MetasploitModule < Msf::Auxiliary
           More precisely, this module uses multiple data sources (in order ViewDNS.info, DNS enumeration
           and Censys) to collect assigned (or have been assigned) IP addresses from the targeted site or domain
           that uses the following:
-            * Amazon Cloudflare, Amazon CloudFront, ArvanCloud, Envoy Proxy, Fastly, Stackpath Fireblade,
-              Stackpath MaxCDN, Imperva Incapsula, InGen Security (BinarySec EasyWAF), KeyCDN, Microsoft AzureCDN,
-              Netlify and Sucuri.
+          * Cloudflare, Amazon CloudFront, ArvanCloud, Envoy Proxy, Fastly, Stackpath Fireblade,
+          Stackpath MaxCDN, Imperva Incapsula, InGen Security (BinarySec EasyWAF), KeyCDN, Microsoft AzureCDN,
+          Netlify and Sucuri.
         },
         'Author' => [
-          'mekhalleh (RAMELLA Sébastien)' # https://www.pirates.re/
+          'mekhalleh (RAMELLA Sébastien)', # https://www.pirates.re/
+          'Yvain'
         ],
         'References' => [
           ['URL', 'https://citadelo.com/en/blog/cloudflare-how-to-do-it-right-and-do-not-reveal-your-real-ip/']
@@ -36,64 +37,97 @@ class MetasploitModule < Msf::Auxiliary
         'License' => MSF_LICENSE,
         'Actions' => [
           ['Automatic', {}],
-          ['Amazon CloudFlare', {
-            'Description' => 'Cloud based Web application firewall of Amazon',
-            'Signatures' => ['server: cloudflare']
-          }],
-          ['Amazon CloudFront', {
-            'Description' => 'Content Delivery Network services of Amazon',
-            'Signatures' => ['x-amz-cf-id:']
-          }],
-          ['ArvanCloud CDN', {
-            'Description' => 'ArvanCloud CDN comprises tens of PoP sites in important locations all around the world to deliver online content to the users',
-            'Signatures' => ['server: ArvanCloud']
-          }],
-          ['AzureCDN', {
-            'Description' => 'Microsoft Azure Content Delivery Network (CDN) is a global content distribution network solution for delivering high bandwidth content',
-            'Signatures' => []
-          }],
-          ['Envoy Proxy', {
-            'Description' => 'An open source edge and service proxy, designed for Cloud-Native applications',
-            'Signatures' => ['server: envoy']
-          }],
-          ['Fastly', {
-            'Description' => 'Another widely used CDN/WAF solution',
-            'Signatures' => ['Fastly-SSL']
-          }],
-          ['Imperva Incapsula', {
-            'Description' => 'Cloud based Web application firewall of Imperva',
-            'Signatures' => ['X-CDN: Incapsula', '_incap_']
-          }],
-          ['InGen Security (BinarySec EasyWAF)', { # Reunion island powa!
-            'Description' => 'Cloud based Web application firewall of InGen Security and BinarySec',
-            'Signatures' => ['binarysec', 'server: gatejs']
-          }],
-          ['KeyCDN', {
-            'Description' => 'KeyCDN is a high performance content delivery network that has been built for the future', # lol
-            'Signatures' => ['Server: keycdn-engine']
-          }],
-          ['Netlifi', {
-            'Description' => 'One workflow, from local development to global deployment',
-            'Signatures' => ['x-nf-request-id:']
-          }],
-          ['NoWAFBypass', {
-            'Description' => 'Do NOT check any bypass method',
-            'Signatures' => []
-          }],
-          ['Stackpath Fireblade', {
-            'Description' => 'Enterprise Website Security & DDoS Protection',
-            'Signatures' => ['Server: fbs']
-          }],
-          ['Stackpath MaxCDN', {
-            'Description' => 'Speed Up your Content Delivery',
-            'Signatures' => ['Server: NetDNA-cache']
-          }],
-          ['Sucuri', {
-            'Description' => 'Cloud based Web application firewall of Sucuri',
-            'Signatures' => ['x-sucuri-id:']
-          }],
+          [
+            'CloudFlare', {
+              'Description' => 'Cloudflare provides SaaS based CDN, WAF, DNS and DDoS mitigation services.',
+              'Signatures' => ['server: cloudflare']
+            }
+          ],
+          [
+            'Amazon CloudFront', {
+              'Description' => 'Content Delivery Network services of Amazon',
+              'Signatures' => ['x-amz-cf-id:']
+            }
+          ],
+          [
+            'ArvanCloud CDN', {
+              'Description' => 'ArvanCloud CDN comprises tens of PoP sites in important locations all around the world to deliver online content to the users',
+              'Signatures' => ['server: ArvanCloud']
+            }
+          ],
+          [
+            'AzureCDN', {
+              'Description' => 'Microsoft Azure Content Delivery Network (CDN) is a global content distribution network solution for delivering high bandwidth content',
+              'Signatures' => []
+            }
+          ],
+          [
+            'Envoy Proxy', {
+              'Description' => 'An open source edge and service proxy, designed for Cloud-Native applications',
+              'Signatures' => ['server: envoy']
+            }
+          ],
+          [
+            'Fastly', {
+              'Description' => 'Another widely used CDN/WAF solution',
+              'Signatures' => ['Fastly-SSL']
+            }
+          ],
+          [
+            'Imperva Incapsula', {
+              'Description' => 'Cloud based Web application firewall of Imperva',
+              'Signatures' => ['X-CDN: Incapsula', '_incap_']
+            }
+          ],
+          [
+            'InGen Security (BinarySec EasyWAF)', { # Reunion island powa!
+              'Description' => 'Cloud based Web application firewall of InGen Security and BinarySec',
+              'Signatures' => ['binarysec', 'server: gatejs']
+            }
+          ],
+          [
+            'KeyCDN', {
+              'Description' => 'KeyCDN is a high performance content delivery network that has been built for the future', # lol
+              'Signatures' => ['Server: keycdn-engine']
+            }
+          ],
+          [
+            'Netlifi', {
+              'Description' => 'One workflow, from local development to global deployment',
+              'Signatures' => ['x-nf-request-id:']
+            }
+          ],
+          [
+            'NoWAFBypass', {
+              'Description' => 'Do NOT check any bypass method',
+              'Signatures' => []
+            }
+          ],
+          [
+            'Stackpath Fireblade', {
+              'Description' => 'Enterprise Website Security & DDoS Protection',
+              'Signatures' => ['Server: fbs']
+            }
+          ],
+          [
+            'Stackpath MaxCDN', {
+              'Description' => 'Speed Up your Content Delivery',
+              'Signatures' => ['Server: NetDNA-cache']
+            }
+          ],
+          [
+            'Sucuri', {
+              'Description' => 'Cloud based Web application firewall of Sucuri',
+              'Signatures' => ['x-sucuri-id:']
+            }
+          ],
         ],
-        'DefaultAction' => 'Automatic'
+        'DefaultAction' => 'Automatic',
+        'Notes' => {
+          'Stability' => [],
+          'Reliability' => [],
+          'SideEffects' => [IOC_IN_LOGS]
+        }
       )
     )
 
@@ -115,7 +149,7 @@ class MetasploitModule < Msf::Auxiliary
       OptBool.new('ALLOW_NOWAF', [true, 'Automatically switch to NoWAFBypass when detection fails with the Automatic action', false]),
       OptBool.new('ENUM_BRT', [true, 'Set DNS bruteforce as optional', true]),
       OptBool.new('REPORT_LEAKS', [true, 'Set to write leaked ip addresses in notes', false]),
-      OptString.new('USERAGENT', [true, 'Specify a personalized User-Agent header in HTTP requests', 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:56.0) Gecko/20100101 Firefox/56.0']),
+      OptString.new('USERAGENT', [true, 'Specify a personalized User-Agent header in HTTP requests', Rex::UserAgent.session_agent]),
       OptEnum.new('TAG', [true, 'Specify the HTML tag in which you want to find the fingerprint', 'title', ['title', 'html']]),
       OptInt.new('HTTP_TIMEOUT', [true, 'HTTP(s) request timeout', 8]),
     ])
@@ -131,23 +165,19 @@ class MetasploitModule < Msf::Auxiliary
 
   # ------------------------------------------------------------------------- #
 
-
   # auxiliary/gather/censys_search.rb
-  def censys_search(keyword, search_type, uid, secret)
+  def censys_search(keyword, uid, secret)
     begin
-      payload = { 'query' => keyword }
-
-      cli = Rex::Proto::Http::Client.new('www.censys.io', 443, {}, true, nil, datastore['Proxies'])
+      cli = Rex::Proto::Http::Client.new('search.censys.io', 443, {}, true, nil, datastore['Proxies'])
       cli.connect
 
       response = cli.request_cgi(
-        'method' => 'POST',
-        'uri' => "/api/v1/search/#{search_type}",
+        'method' => 'GET',
+        'uri' => "/api/v2/hosts/search?q=#{keyword}",
         'agent' => datastore['USERAGENT'],
         'headers' => {
-          'Authorization' => 'Basic ' + Rex::Text.encode_base64(uid.to_s + ':' + secret.to_s)
-        },
-        'data' => payload.to_json
+          'Authorization' => "Basic #{Rex::Text.encode_base64("#{uid}:#{secret}")}"
+        }
       )
       results = cli.send_recv(response)
     rescue ::Rex::ConnectionError, Errno::ECONNREFUSED, Errno::ETIMEDOUT
@@ -160,8 +190,8 @@ class MetasploitModule < Msf::Auxiliary
     end
 
     records = ActiveSupport::JSON.decode(results.body)
-    results = records['results']
 
+    results = records['result']
     parse_ipv4(results)
   end
 
@@ -252,7 +282,8 @@ class MetasploitModule < Msf::Auxiliary
       response = http.send_recv(request)
       http.close
     rescue ::Rex::ConnectionError, Errno::ECONNREFUSED, Errno::ETIMEDOUT
-    rescue StandardError => e
+      # noop
+    rescue ::StandardError => e
       print_error(e.message)
     end
     return false if response.nil?
@@ -263,7 +294,7 @@ class MetasploitModule < Msf::Auxiliary
   # auxiliary/gather/censys_search.rb
   def parse_ipv4(records)
     ip_list = []
-    records.each do |ipv4|
+    records['hits'].each do |ipv4|
       ip_list.push(ipv4['ip'])
     end
     ip_list
@@ -313,7 +344,7 @@ class MetasploitModule < Msf::Auxiliary
         begin
           # Searches for the chain to compare in the defined tag.
           found = true if html.at(datastore['TAG']).to_s.include? fingerprint.to_s.encode('utf-8')
-        rescue NoMethodError, Encoding::CompatibilityError
+        rescue NoMethodError, ::Encoding::CompatibilityError
           return false
         end
 
@@ -333,7 +364,7 @@ class MetasploitModule < Msf::Auxiliary
         vprint_line("      --> responded with HTTP status code: #{response.code} to #{response.headers['location']}")
         begin
           found = true if response.headers['location'].include?(datastore['hostname'])
-        rescue NoMethodError, Encoding::CompatibilityError
+        rescue NoMethodError, ::Encoding::CompatibilityError
           return false
         end
 
@@ -518,7 +549,7 @@ class MetasploitModule < Msf::Auxiliary
     domain_name = PublicSuffix.parse(datastore['HOSTNAME']).domain
     ip_list = []
 
-    # Start collecting informations for grabbing all IP adress(es).
+    # Start collecting information for grabbing all IP address(es).
 
     # ViewDNS.info
     ip_records = grab_domain_ip_history(domain_name)
@@ -546,7 +577,7 @@ class MetasploitModule < Msf::Auxiliary
 
     # Censys search
     if [datastore['CENSYS_UID'], datastore['CENSYS_SECRET']].none?(&:nil?)
-      ip_records = censys_search(domain_name, 'ipv4', datastore['CENSYS_UID'], datastore['CENSYS_SECRET'])
+      ip_records = censys_search(domain_name, datastore['CENSYS_UID'], datastore['CENSYS_SECRET'])
       if ip_records && !ip_records.empty?
         ip_list |= ip_records
       end
@@ -566,7 +597,7 @@ class MetasploitModule < Msf::Auxiliary
     #  - addresses are not provided
 
     ip_blacklist = []
-    # Cleaning IP addresses if nessesary.
+    # Cleaning IP addresses if necessary.
     case @my_action.name
     when /ArvanCloud/
       ip_blacklist = arvancloud_ips
@@ -593,7 +624,7 @@ class MetasploitModule < Msf::Auxiliary
     # Add. Blacklisted IP address(es) from file.
     unless datastore['IPBLACKLIST_FILE'].nil?
       if File.readable? datastore['IPBLACKLIST_FILE']
-        ips = File.new(datastore['IPBLACKLIST_FILE']).read.split
+        ips = File.readlines(datastore['IPBLACKLIST_FILE'], chomp: true)
         ips.each do |ip|
           ip_blacklist << ip
         end
@@ -619,7 +650,7 @@ class MetasploitModule < Msf::Auxiliary
         records << ip.to_s unless is_listed
       end
     else
-      records.concat(ip_list.uniq.map { |ip| ip.to_s })
+      records.concat(ip_list.uniq.map(&:to_s))
     end
 
     # Exit if no IP address(es) has been found after cleaning.

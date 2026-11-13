@@ -10,8 +10,7 @@ module Msf
 class OptString < OptBase
 
   # This adds a length parameter to check for the maximum length of strings.
-  def initialize(in_name, attrs = [],
-               required: false, desc: nil, default: nil, enums: [], regex: nil, aliases: [], max_length: nil)
+  def initialize(in_name, attrs = [], **kwargs)
     super
   end
 
@@ -35,7 +34,7 @@ class OptString < OptBase
     value
   end
 
-  def valid?(value=self.value, check_empty: true)
+  def valid?(value=self.value, check_empty: true, datastore: nil)
     value = normalize(value)
     return false if check_empty && empty_required_value?(value)
     return false if invalid_value_length?(value)

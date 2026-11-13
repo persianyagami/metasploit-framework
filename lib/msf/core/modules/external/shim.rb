@@ -1,10 +1,13 @@
 # -*- coding: binary -*-
-require 'msf/core/modules/external'
 
 class Msf::Modules::External::Shim
   def self.generate(module_path, framework)
     mod = Msf::Modules::External.new(module_path, framework: framework)
-    return nil unless mod.meta
+    # first check if meta exists and raise an issue if not, #14281
+    # raise instead of returning nil to avoid confusion
+    unless mod.meta
+      raise LoadError, " Try running file manually to check for errors or dependency issues."
+    end
     case mod.meta['type']
     when 'remote_exploit'
       remote_exploit(mod)
@@ -32,8 +35,10 @@ class Msf::Modules::External::Shim
     ERB.new(File.read(template)).result(binding)
   end
 
-  def self.common_metadata(meta = {})
-    render_template('common_metadata.erb', meta)
+  def self.common_metadata(meta = {}, default_options: {})
+    # Combine any template defaults with the defaults specified within the external module's metadata
+    default_options = default_options.merge(meta[:default_options])
+    render_template('common_metadata.erb', meta.merge(default_options: default_options))
   end
 
   def self.common_check(meta = {})
@@ -51,12 +56,8 @@ class Msf::Modules::External::Shim
     meta[:capabilities]     = mod.meta['capabilities']
     meta[:notes]            = transform_notes(mod.meta['notes'])
 
-    if mod.meta['describe_payload_options'].nil?
-      mod.meta['describe_payload_options'] = {}
-    end
-    meta[:default_options]  = mod.meta['describe_payload_options'].map do |name, value|
-      "#{name.dump} => #{value.inspect}"
-    end.join(",\n          ")
+    # Additionally check the 'describe_payload_options' key for backwards compatibility
+    meta[:default_options] = (mod.meta['default_options'] || mod.meta['describe_payload_options'] || {})
 
     meta
   end
@@ -79,7 +80,7 @@ class Msf::Modules::External::Shim
           [#{o['required']}, #{o['description'].dump}, #{o['default'].inspect}])"
       end
     end
-    options.reject! { |o| o.nil? }
+    options.compact!
     options.join(",\n          ")
   end
 

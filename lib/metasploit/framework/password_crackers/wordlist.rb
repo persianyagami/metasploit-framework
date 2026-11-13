@@ -64,7 +64,7 @@ module Metasploit
         #   @return [Mdm::Workspace] the workspace this cracker is for.
         attr_accessor :workspace
 
-        validates :custom_wordlist, :'Metasploit::Framework::File_path' => true, if: -> { 'custom_wordlist.present?' }
+        validates :custom_wordlist, :'Metasploit::Framework::File_path' => true, if: -> { custom_wordlist.present? }
 
         validates :mutate,
                   inclusion: { in: [true, false], message: "must be true or false"  }
@@ -360,7 +360,7 @@ module Metasploit
           results.flatten.uniq
         end
 
-        # A getter for a memoized version fo the mutation keys list
+        # A getter for a memoized version of the mutation keys list
         #
         # @return [Array<Array>] a 2D array of all mutation combinations
         def mutation_keys

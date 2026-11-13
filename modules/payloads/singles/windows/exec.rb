@@ -3,17 +3,13 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/payload/windows/exec'
-
 ###
 #
 # Executes a command on the target machine
 #
 ###
 module MetasploitModule
-
   CachedSize = 192
 
-  include Msf::Payload::Windows::Exec
-
+  include Msf::Payload::Windows::Exec_X86
 end

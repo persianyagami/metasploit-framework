@@ -1,4 +1,5 @@
 # -*- coding: binary -*-
+
 module Msf
 
 ###
@@ -9,6 +10,23 @@ module Msf
 
 module Auxiliary::Scanner
 
+include Msf::Auxiliary::MultipleTargetHosts
+
+class AttemptFailed < Msf::Auxiliary::Failed
+end
+
+# Scanner modules handle per-host failure reporting through replicants
+# inside their run_host/run_batch threads.  Override the default
+# report_failure so that the parent-level call from job_run_proc's
+# ensure block does not create a duplicate or misattributed attempt
+# after a scan.  The check path (check_simple) still needs the
+# default report_failure behaviour, so we only skip when the scanner's
+# run method has executed.
+def report_failure
+  return if @scanner_run_completed
+
+  super
+end
 
 #
 # Initializes an instance of a recon auxiliary module
@@ -28,20 +46,6 @@ def initialize(info = {})
 
 end
 
-def has_check?
-  respond_to?(:check_host)
-end
-
-def check
-  nmod = replicant
-  begin
-    nmod.check_host(datastore['RHOST'])
-  rescue NoMethodError
-    Exploit::CheckCode::Unsupported
-  end
-end
-
-
 def peer
   # IPv4 addr can be 16 chars + 1 for : and + 5 for port
   super.ljust(21)
@@ -51,16 +55,21 @@ end
 # The command handler when launched from the console
 #
 def run
+  @scanner_run_completed = false
   @show_progress = datastore['ShowProgress']
   @show_percent  = datastore['ShowProgressPercent'].to_i
 
-  ar             = Rex::Socket::RangeWalker.new(datastore['RHOSTS'])
-  @range_count   = ar.length || 0
+  if self.respond_to?(:session) && session
+    datastore['RHOSTS'] = session.address
+  end
+
+  rhosts_walker  = Msf::RhostsWalker.new(self.datastore['RHOSTS'], self.datastore).to_enum
+  @range_count   = rhosts_walker.count || 0
   @range_done    = 0
   @range_percent = 0
 
   threads_max = datastore['THREADS'].to_i
-  @tl = []
+  @thread_list = []
   @scan_errors = []
 
   res = Queue.new
@@ -100,25 +109,31 @@ def run
       break if has_fatal_errors?
 
       # Spawn threads for each host
-      while (@tl.length < threads_max)
+      while (@thread_list.length < threads_max)
 
         # Stop scanning if we hit a fatal error
         break if has_fatal_errors?
 
-        ip = ar.next_ip
-        break if not ip
+        begin
+          datastore = rhosts_walker.next
+        rescue StopIteration
+          datastore = nil
+        end
+        break unless datastore
 
-        @tl << framework.threads.spawn("ScannerHost(#{self.refname})-#{ip}", false, ip.dup) do |tip|
-          targ = tip
+        @thread_list << framework.threads.spawn("ScannerHost(#{self.refname})-#{datastore['RHOST']}", false, datastore.dup) do |thr_datastore|
+          targ = thr_datastore['RHOST']
           nmod = self.replicant
-          nmod.datastore['RHOST'] = targ
+          nmod.datastore = thr_datastore
 
           begin
-            res << {tip => nmod.run_host(targ)}
+            res << { targ => nmod.run_host(targ) }
           rescue ::Rex::BindFailed
             if datastore['CHOST']
               @scan_errors << "The source IP (CHOST) value of #{datastore['CHOST']} was not usable"
             end
+          rescue Msf::Auxiliary::Scanner::AttemptFailed => e
+            nmod.vprint_error("#{e}")
           rescue ::Rex::ConnectionError, ::Rex::ConnectionProxyError, ::Errno::ECONNRESET, ::Errno::EINTR, ::Rex::TimeoutError, ::Timeout::Error, ::EOFError
           rescue ::Interrupt,::NoMethodError, ::RuntimeError, ::ArgumentError, ::NameError
             raise $!
@@ -140,19 +155,17 @@ def run
       break if has_fatal_errors?
 
       # Exit once we run out of hosts
-      if(@tl.length == 0)
+      if(@thread_list.length == 0)
         break
       end
 
-      # Assume that the oldest thread will be one of the
-      # first to finish and wait for it.  After that's
-      # done, remove any finished threads from the list
-      # and continue on.  This will open up at least one
-      # spot for a new thread
-      tla = @tl.length
-      @tl.first.join
-      @tl.delete_if { |t| not t.alive? }
-      tlb = @tl.length
+      # Attempt to wait for the oldest thread for a second,
+      # remove any finished threads from the list
+      # and continue on.
+      tla = @thread_list.length
+      @thread_list.first.join(1)
+      @thread_list.delete_if { |t| not t.alive? }
+      tlb = @thread_list.length
 
       @range_done += (tla - tlb)
       scanner_show_progress() if @show_progress
@@ -171,7 +184,7 @@ def run
 
     size = run_batch_size()
 
-    ar = Rex::Socket::RangeWalker.new(datastore['RHOSTS'])
+    rhosts_walker = Msf::RhostsWalker.new(self.datastore['RHOSTS'], self.datastore).to_enum
 
     while(true)
       nohosts = false
@@ -179,18 +192,22 @@ def run
       # Stop scanning if we hit a fatal error
       break if has_fatal_errors?
 
-      while (@tl.length < threads_max)
+      while (@thread_list.length < threads_max)
 
         batch = []
 
         # Create batches from each set
         while (batch.length < size)
-          ip = ar.next_ip
-          if (not ip)
+          begin
+            datastore = rhosts_walker.next
+          rescue StopIteration
+            datastore = nil
+          end
+          if (not datastore)
             nohosts = true
             break
           end
-          batch << ip
+          batch << datastore['RHOST']
         end
 
         # Create a thread for each batch
@@ -200,10 +217,12 @@ def run
             mybatch = bat.dup
             begin
               nmod.run_batch(mybatch)
-          rescue ::Rex::BindFailed
-            if datastore['CHOST']
-              @scan_errors << "The source IP (CHOST) value of #{datastore['CHOST']} was not usable"
-            end
+            rescue ::Rex::BindFailed
+              if datastore['CHOST']
+                @scan_errors << "The source IP (CHOST) value of #{datastore['CHOST']} was not usable"
+              end
+            rescue Msf::Auxiliary::Scanner::AttemptFailed => e
+              print_error("#{e}")
             rescue ::Rex::ConnectionError, ::Rex::ConnectionProxyError, ::Errno::ECONNRESET, ::Errno::EINTR, ::Rex::TimeoutError, ::Timeout::Error
             rescue ::Interrupt,::NoMethodError, ::RuntimeError, ::ArgumentError, ::NameError
               raise $!
@@ -214,11 +233,11 @@ def run
             end
           end
           thread[:batch_size] = batch.length
-          @tl << thread
+          @thread_list << thread
         end
 
         # Exit once we run out of hosts
-        if (@tl.length == 0 or nohosts)
+        if (@thread_list.length == 0 or nohosts)
           break
         end
       end
@@ -227,21 +246,19 @@ def run
       break if has_fatal_errors?
 
       # Exit if there are no more pending threads
-      if (@tl.length == 0)
+      if (@thread_list.length == 0)
         break
       end
 
-      # Assume that the oldest thread will be one of the
-      # first to finish and wait for it.  After that's
-      # done, remove any finished threads from the list
-      # and continue on.  This will open up at least one
-      # spot for a new thread
+      # Attempt to wait for the oldest thread for a second,
+      # remove any finished threads from the list
+      # and continue on.
       tla = 0
-      @tl.map {|t| tla += t[:batch_size] }
-      @tl.first.join
-      @tl.delete_if { |t| not t.alive? }
+      @thread_list.map {|t| tla += t[:batch_size] if t[:batch_size] }
+      @thread_list.first.join(1)
+      @thread_list.delete_if { |t| not t.alive? }
       tlb = 0
-      @tl.map {|t| tlb += t[:batch_size] }
+      @thread_list.map {|t| tlb += t[:batch_size] if t[:batch_size] }
 
       @range_done += tla - tlb
       scanner_show_progress() if @show_progress
@@ -257,12 +274,13 @@ def run
     print_status("Caught interrupt from the console...")
     return
   ensure
+    @scanner_run_completed = true
     seppuko!()
   end
 end
 
 def seppuko!
-  @tl.each do |t|
+  @thread_list.each do |t|
     begin
       t.kill if t.alive?
     rescue ::Exception
@@ -276,10 +294,10 @@ end
 
 def scanner_handle_fatal_errors
   return unless has_fatal_errors?
-  return unless @tl
+  return unless @thread_list
 
   # First kill any running threads
-  @tl.each {|t| t.kill if t.alive? }
+  @thread_list.each {|t| t.kill if t.alive? }
 
   # Show the unique errors triggered by the scan
   uniq_errors = @scan_errors.uniq
@@ -335,6 +353,15 @@ def add_delay_jitter(_delay, _jitter)
   end
 end
 
-end
+def fail_with(reason, msg = nil, abort: false)
+  if abort
+    # raising Failed will case the run to be aborted
+    raise Msf::Auxiliary::Failed, "#{reason.to_s}: #{msg}"
+  else
+    # raising AttemptFailed will cause the run_host / run_batch to be aborted
+    raise Msf::Auxiliary::Scanner::AttemptFailed, "#{reason.to_s}: #{msg}"
+  end
 end
 
+end
+end

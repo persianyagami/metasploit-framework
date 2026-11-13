@@ -1,9 +1,8 @@
 # -*- coding: binary -*-
 require 'cgi'
 require 'uri'
-require 'rex/proto/http'
+
 require 'nokogiri'
-require 'rkelly'
 
 module Rex
 module Proto
@@ -116,6 +115,16 @@ class Response < Packet
     Nokogiri::XML(self.body)
   end
 
+  def gzip_decode!
+    self.body = gzip_decode
+  end
+
+  def gzip_decode
+    gz = Zlib::GzipReader.new(StringIO.new(self.body.to_s))
+
+    gz.read
+  end
+
   # Returns a parsed json document.
   # Instead of using regexes to parse the JSON body, you should use this.
   #
@@ -148,6 +157,8 @@ class Response < Packet
   # @see https://github.com/tenderlove/rkelly
   # @return [Array<RKelly::Nodes::SourceElementsNode>]
   def get_html_scripts
+    require 'rkelly'
+
     n = get_html_document
     rkelly = RKelly::Parser.new
     n.search('//script').map { |s| rkelly.parse(s.text) }
@@ -186,7 +197,7 @@ class Response < Packet
   #
   def update_cmd_parts(str)
     if (md = str.match(/HTTP\/(.+?)\s+(\d+)\s?(.+?)\r?\n?$/))
-      self.message = md[3].gsub(/\r/, '')
+      self.message = md[3].gsub("\r", '')
       self.code    = md[2].to_i
       self.proto   = md[1]
     else
@@ -219,11 +230,9 @@ class Response < Packet
   # @return [URI] the uri of the redirection location.
   # @return [nil] if the response hasn't a Location header or it isn't a valid uri.
   def redirection
-    begin
-      URI(headers['Location'])
-    rescue ::URI::InvalidURIError
-      nil
-    end
+    URI(headers['Location'])
+  rescue ArgumentError, ::URI::InvalidURIError
+    nil
   end
 
   #

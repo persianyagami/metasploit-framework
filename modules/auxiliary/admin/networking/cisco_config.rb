@@ -3,8 +3,6 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/auxiliary/cisco'
-
 class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::Cisco
   include Msf::Exploit::Deprecated
@@ -19,7 +17,12 @@ class MetasploitModule < Msf::Auxiliary
           This module imports a Cisco IOS or NXOS device configuration.
         },
         'License' => MSF_LICENSE,
-        'Author' => [ 'h00die']
+        'Author' => ['h00die'],
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [],
+          'Reliability' => []
+        }
       )
     )
 
@@ -30,12 +33,11 @@ class MetasploitModule < Msf::Auxiliary
         Opt::RPORT(22)
       ]
     )
-
   end
 
   def run
     unless ::File.exist?(datastore['CONFIG'])
-      fail_with Failure::BadConfig, "Cisco config file #{datastore['CONFIG']} does not exists!"
+      fail_with Failure::BadConfig, "Cisco config file #{datastore['CONFIG']} does not exist!"
     end
     cisco_config = ::File.open(datastore['CONFIG'], 'rb')
     print_status('Importing config')

@@ -1,63 +1,10 @@
 # -*- coding: binary -*-
-require 'msf/core'
+
+require 'rex'
 
 module Msf
 
-###
-#
-# Event notifications that affect sessions.
-#
-###
-module SessionEvent
 
-  #
-  # Called when a session is opened.
-  #
-  def on_session_open(session)
-  end
-
-  #
-  # Called when a session is closed.
-  #
-  def on_session_close(session, reason='')
-  end
-
-  #
-  # Called when the user interacts with a session.
-  #
-  def on_session_interact(session)
-  end
-
-  #
-  # Called when the user writes data to a session.
-  #
-  def on_session_command(session, command)
-  end
-
-  #
-  # Called when output comes back from a user command.
-  #
-  def on_session_output(session, output)
-  end
-
-  #
-  # Called when a file is uploaded.
-  #
-  def on_session_upload(session, local_path, remote_path)
-  end
-
-  #
-  # Called when a file is downloaded.
-  #
-  def on_session_download(session, remote_path, local_path)
-  end
-
-  #
-  # Called when a file is deleted.
-  #
-  def on_session_filedelete(session, path)
-  end
-end
 
 ###
 #
@@ -85,16 +32,7 @@ module Session
   end
 
   # Direct descendants
-  require 'msf/core/session/interactive'
-  require 'msf/core/session/basic'
-  require 'msf/core/session/comm'
-
   # Provider interfaces
-  require 'msf/core/session/provider/single_command_execution'
-  require 'msf/core/session/provider/multi_command_execution'
-  require 'msf/core/session/provider/single_command_shell'
-  require 'msf/core/session/provider/multi_command_shell'
-
   def self.type
     "unknown"
   end
@@ -143,6 +81,9 @@ module Session
   # Returns the peer side of the tunnel.
   #
   def tunnel_peer
+  end
+
+  def comm_channel
   end
 
   #
@@ -197,7 +138,9 @@ module Session
   # Returns a pretty representation of the tunnel.
   #
   def tunnel_to_s
-    "#{(tunnel_local || '??')} -> #{(tunnel_peer || '??')}"
+    tunnel_str = "#{tunnel_local || '??'} -> #{tunnel_peer || '??'}"
+    tunnel_str << " #{comm_channel}" if comm_channel
+    tunnel_str
   end
 
   ##
@@ -244,9 +187,17 @@ module Session
   # exploit instance. Store references from and to the exploit module.
   #
   def set_from_exploit(m)
+    target_host = nil
+    unless m.target_host.blank?
+      # only propagate the target_host value if it's exactly 1 host
+      if (rw = Rex::Socket::RangeWalker.new(m.target_host)).length == 1
+        target_host = rw.next_ip
+      end
+    end
+
     self.via = { 'Exploit' => m.fullname }
     self.via['Payload'] = ('payload/' + m.datastore['PAYLOAD'].to_s) if m.datastore['PAYLOAD']
-    self.target_host = Rex::Socket.getaddress(m.target_host) if (m.target_host.to_s.strip.length > 0)
+    self.target_host = target_host
     self.target_port = m.target_port if (m.target_port.to_i != 0)
     self.workspace   = m.workspace
     self.username    = m.owner
@@ -284,10 +235,11 @@ module Session
   #
   def cleanup
     if db_record and framework.db.active
-      ::ApplicationRecord.connection_pool.with_connection {
+      ::ApplicationRecord.connection_pool.with_connection do
         framework.db.update_session(id: db_record.id, closed_at: Time.now.utc, close_reason: db_record.close_reason)
-        db_record = nil
-      }
+      rescue ActiveRecord::RecordNotFound
+        nil  # this will fail if the workspace was deleted before the session was closed, see #18561
+      end
     end
   end
 

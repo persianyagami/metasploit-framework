@@ -8,7 +8,7 @@ This module has been tested on the following hardware/OS combinations.
 The ICX config can be found [no passwords](https://github.com/h00die/MSF-Testing-Scripts/blob/master/brocade_icx6430_nopass.conf),
 [hashes](https://github.com/h00die/MSF-Testing-Scripts/blob/master/brocade_icx6430_pass.conf)
 
-This module will look for the follow parameters which contain credentials:
+This module will look for the following parameters which contain credentials:
 
 * FastIron
   * `show configuration`
@@ -74,7 +74,7 @@ resource (brocade.rb)> run
 [+] ENCRYPTED SNMP community $MlVzZCFAbg== with permissions ro
 [+] ENCRYPTED SNMP community $U2kyXj1k with permissions rw
 [*] Post module execution completed
-msf5 post(networking/gather/enum_brocade) > loot
+msf post(networking/gather/enum_brocade) > loot
 
 Loot
 ====
@@ -84,7 +84,7 @@ host       service  type             name         content     info              
 10.0.4.51           brocade.version  version.txt  text/plain  Brocade Version        /root/.msf4/loot/20190601221959_default_10.0.4.51_brocade.version_003751.txt
 10.0.4.51           brocade.config   config.txt   text/plain  Brocade Configuration  /root/.msf4/loot/20190601222004_default_10.0.4.51_brocade.config_998514.txt
 
-msf5 post(networking/gather/enum_brocade) > creds
+msf post(networking/gather/enum_brocade) > creds
 Credentials
 ===========
 

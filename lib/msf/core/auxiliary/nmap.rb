@@ -1,6 +1,4 @@
 # -*- coding: binary -*-
-require 'rex/parser/nmap_nokogiri'
-require 'rex/parser/nmap_xml'
 require 'open3'
 
 module Msf
@@ -211,7 +209,7 @@ def nmap_validate_arg(str)
     return false
   end
   # Check for quote balance
-  if !(str.scan(/'/).size % 2).zero? or !(str.scan(/"/).size % 2).zero?
+  if !(str.scan('\'').size % 2).zero? or !(str.scan('"').size % 2).zero?
     print_error "Unbalanced quotes in nmap argument: #{str}"
     return false
   end

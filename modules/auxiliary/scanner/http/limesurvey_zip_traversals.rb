@@ -26,26 +26,29 @@ class MetasploitModule < Msf::Auxiliary
           3.0.0-171222, and 2.70.0-170921.
         },
         'License' => MSF_LICENSE,
-        'Author' =>
-          [
-            'h00die', # msf module
-            'Matthew Aberegg', # edb/discovery cve 2020
-            'Michael Burkey', # edb/discovery cve 2020
-            'Federico Fernandez', # cve 2019
-            'Alejandro Parodi' # credited in cve 2019 writeup
-          ],
-        'References' =>
-          [
-            # CVE-2020-11455
-            ['EDB', '48297'], # CVE-2020-11455
-            ['CVE', '2020-11455'],
-            ['URL', 'https://github.com/LimeSurvey/LimeSurvey/commit/daf50ebb16574badfb7ae0b8526ddc5871378f1b'],
-            # CVE-2019-9960
-            ['CVE', '2019-9960'],
-            ['URL', 'https://www.secsignal.org/en/news/cve-2019-9960-arbitrary-file-download-in-limesurvey/'],
-            ['URL', 'https://github.com/LimeSurvey/LimeSurvey/commit/1ed10d3c423187712b8f6a8cb2bc9d5cc3b2deb8']
-          ],
-        'DisclosureDate' => 'Apr 02 2020'
+        'Author' => [
+          'h00die', # msf module
+          'Matthew Aberegg', # edb/discovery cve 2020
+          'Michael Burkey', # edb/discovery cve 2020
+          'Federico Fernandez', # cve 2019
+          'Alejandro Parodi' # credited in cve 2019 writeup
+        ],
+        'References' => [
+          # CVE-2020-11455
+          ['EDB', '48297'], # CVE-2020-11455
+          ['CVE', '2020-11455'],
+          ['URL', 'https://github.com/LimeSurvey/LimeSurvey/commit/daf50ebb16574badfb7ae0b8526ddc5871378f1b'],
+          # CVE-2019-9960
+          ['CVE', '2019-9960'],
+          ['URL', 'https://www.secsignal.org/en/news/cve-2019-9960-arbitrary-file-download-in-limesurvey/'],
+          ['URL', 'https://github.com/LimeSurvey/LimeSurvey/commit/1ed10d3c423187712b8f6a8cb2bc9d5cc3b2deb8']
+        ],
+        'DisclosureDate' => '2020-04-02',
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [IOC_IN_LOGS],
+          'Reliability' => []
+        }
       )
     )
 
@@ -174,7 +177,7 @@ class MetasploitModule < Msf::Auxiliary
     /Version\s+(?<version>\d\.\d{1,2}\.\d{1,2})/ =~ res.body
     return nil unless version
 
-    Gem::Version.new(version)
+    Rex::Version.new(version)
   end
 
   def run_host(ip)
@@ -188,14 +191,14 @@ class MetasploitModule < Msf::Auxiliary
       cve_2019_9960_pre3_15_9 cookie, ip
     end
     vprint_status "Version Detected: #{version.version}"
-    if version.between?(Gem::Version.new('4.0'), Gem::Version.new('4.1.11'))
+    if version.between?(Rex::Version.new('4.0'), Rex::Version.new('4.1.11'))
       cve_2020_11455 cookie, ip
-    elsif version.between?(Gem::Version.new('2.50.0'), Gem::Version.new('3.15.9'))
+    elsif version.between?(Rex::Version.new('2.50.0'), Rex::Version.new('3.15.9'))
       cve_2019_9960_version_3 cookie, ip
     # 2.50 is when LimeSurvey started doing almost daily releases.  This version was
     # picked arbitrarily as I can't seem to find a lower bounds on when this other
     # method may be needed.
-    elsif version < Gem::Version.new('2.50.0')
+    elsif version < Rex::Version.new('2.50.0')
       cve_2019_9960_pre25 cookie, ip
     else
       print_bad "No exploit for version #{version.version}"

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2003-2018 CORE Security Technologies
 #
 # This software is provided under under a slightly modified version
@@ -47,7 +47,7 @@ metadata = {
         {'type': 'url', 'ref': 'http://www.quarkslab.com/en-blog+read+13'},
         {'type': 'url', 'ref': 'https://code.google.com/p/creddump/'},
         {'type': 'url', 'ref': 'http://lab.mediaservice.net/code/cachedump.rb'},
-        {'type': 'url', 'ref': 'http://insecurety.net/?p=768'},
+        {'type': 'url', 'ref': 'https://web.archive.org/web/20140207114722/http://insecurety.net/?p=768'},
         {'type': 'url', 'ref': 'http://www.beginningtoseethelight.org/ntsecurity/index.htm'},
         {'type': 'url', 'ref': 'http://www.ntdsxtract.com/downloads/ActiveDirectoryOfflineHashDumpAndForensics.pdf'},
         {'type': 'url', 'ref': 'http://www.passcape.com/index.php?section=blog&cmd=details&id=15'},
@@ -101,7 +101,7 @@ class DumpSecrets:
         self.__canProcessSAMLSA = True
         self.__kdcHost = None
         self.__execMethod = execMethod
-        
+
 
     def connect(self):
         self.__smbConnection = SMBConnection(self.__remoteName, self.__remoteHost)

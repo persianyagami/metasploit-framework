@@ -3,8 +3,6 @@ source 'https://rubygems.org'
 #   spec.add_runtime_dependency '<name>', [<version requirements>]
 gemspec name: 'metasploit-framework'
 
-gem 'sqlite3', '~>1.3.0'
-
 # separate from test as simplecov is not run on travis-ci
 group :coverage do
   # code coverage for tests
@@ -18,6 +16,9 @@ group :development do
   gem 'yard'
   # for development and testing purposes
   gem 'pry-byebug'
+  # Ruby Debugging Library - rebuilt and included by default from Ruby 3.1 onwards.
+  # Replaces the old lib/debug.rb and provides more features.
+  gem 'debug', '>= 1.0.0'
   # module documentation
   gem 'octokit'
   # memory profiling
@@ -26,25 +27,32 @@ group :development do
   gem 'ruby-prof'
   # Metasploit::Aggregator external session proxy
   # disabled during 2.5 transition until aggregator is available
-  #gem 'metasploit-aggregator'
+  # gem 'metasploit-aggregator'
 end
 
 group :development, :test do
-  # automatically include factories from spec/factories
-  gem 'factory_bot_rails'
-  # Make rspec output shorter and more useful
-  gem 'fivemat'
+  # For ./tools/dev/update_gem_licenses.sh - custom fork (branch: rapid7-rubyzip-dependency-bump) until https://github.com/pivotal/LicenseFinder/pull/1063 lands
+  gem 'license_finder', git: 'https://github.com/rapid7/LicenseFinder', ref: '2b1aefcfd6d0745d17843050c1c89f973c1fa98c'
   # running documentation generation tasks and rspec tasks
   gem 'rake'
   # Define `rake spec`.  Must be in development AND test so that its available by default as a rake test when the
   # environment is development
   gem 'rspec-rails'
   gem 'rspec-rerun'
-  gem 'rubocop'
-  gem 'swagger-blocks'
+  # Required during CI as well local development
+  gem 'rubocop', '1.75.7'
 end
 
 group :test do
+  # automatically include factories from spec/factories
+  gem 'test-prof'
+  gem 'factory_bot_rails'
+  # Make rspec output shorter and more useful
+  gem 'fivemat'
+  # rspec formatter for acceptance tests
+  gem 'allure-rspec'
   # Manipulate Time.now in specs
   gem 'timecop'
+  # stub and set expectations on HTTP requests
+  gem 'webmock', '~> 3.18'
 end

@@ -217,18 +217,12 @@ class SessionManager < Hash
       # Insert the session into the session hash table
       self[next_sid.to_i] = session
 
-      # Notify the framework that we have a new session opening up...
-      # Don't let errant event handlers kill our session
-      begin
-        framework.events.on_session_open(session)
-      rescue ::Exception => e
-        wlog("Exception in on_session_open event handler: #{e.class}: #{e}")
-        wlog("Call Stack\n#{e.backtrace.join("\n")}")
-      end
-
       if session.respond_to?("console")
         session.console.on_command_proc = Proc.new { |command, error| framework.events.on_session_command(session, command) }
         session.console.on_print_proc = Proc.new { |output| framework.events.on_session_output(session, output) }
+      end
+      if session.respond_to?("on_registered")
+        session.on_registered
       end
     end
 
@@ -271,10 +265,9 @@ class SessionManager < Hash
     session = nil
     sid = sid.to_i
 
-    if sid > 0
-      session = self[sid]
-    elsif sid == -1
-      sid = self.keys.max
+    if sid < 0
+      session = self[self.keys.sort[sid]]
+    elsif sid > 0
       session = self[sid]
     end
 
@@ -301,4 +294,3 @@ protected
 end
 
 end
-

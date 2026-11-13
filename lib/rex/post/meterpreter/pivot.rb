@@ -17,7 +17,7 @@ class PivotListener
   attr_accessor :stage
 
   def initialize(session_class, url, stage)
-    self.id = [SecureRandom.uuid.gsub(/-/, '')].pack('H*')
+    self.id = [SecureRandom.uuid.gsub('-', '')].pack('H*')
     self.session_class = session_class
     self.url = url
     self.stage = stage
@@ -89,6 +89,7 @@ class Pivot
     # TODO: add more platforms
     case opts[:platform]
     when 'windows'
+      c.include(::Msf::Sessions::MeterpreterOptions::Windows) # Moved to be platform-specific
       # Include the appropriate reflective dll injection module for the target process architecture...
       if opts[:arch] == ARCH_X86
         c.include(::Msf::Payload::Windows::MeterpreterLoader)
@@ -125,7 +126,6 @@ class Pivot
     pivot_listener = PivotListener.new(::Msf::Sessions::Meterpreter_x86_Win, url, stage_config)
 
     request.add_tlv(TLV_TYPE_PIVOT_STAGE_DATA, stage)
-    request.add_tlv(TLV_TYPE_PIVOT_STAGE_DATA_SIZE, stage.length)
     request.add_tlv(TLV_TYPE_PIVOT_ID, pivot_listener.id)
 
     client.send_request(request)
@@ -147,8 +147,18 @@ class Pivot
     self.pivoted_session = listener.session_class.new(nil, opts)
 
     self.pivoted_session.framework = self.client.framework
-    self.pivoted_session.bootstrap({'AutoVerifySessionTimeout' => 30})
-    self.client.framework.sessions.register(self.pivoted_session)
+    registration = Proc.new do
+      self.pivoted_session.bootstrap({'AutoVerifySessionTimeout' => 30})
+      self.client.framework.sessions.register(self.pivoted_session)
+
+      begin
+        self.client.framework.events.on_session_open(self.pivoted_session)
+      rescue ::Exception => e
+        wlog("Exception in on_session_open event handler: #{e.class}: #{e}")
+        wlog("Call Stack\n#{e.backtrace.join("\n")}")
+      end
+    end
+    self.client.framework.sessions.schedule registration
   end
 
 protected

@@ -1,6 +1,5 @@
 # -*- coding: binary -*-
 require 'rex/socket'
-require 'rex/proto/tftp'
 require 'tempfile'
 
 module Rex
@@ -43,7 +42,7 @@ class Client
   def parse_tftp_response(str)
     return nil unless str.length >= 4
     ret = str.unpack("nnA*")
-    ret[2] = str[4,str.size] if ret[0] == OpData
+    ret[2] = str[4,str.size] if ret[0] == Constants::OpData
     return ret
   end
 
@@ -85,23 +84,24 @@ class Client
 
   def monitor_server_sock
     yield "Listening for incoming ACKs" if block_given?
-    res = self.server_sock.recvfrom(65535)
+    res = self.server_sock.timed_recvfrom(65535)
+    res = res ? [res[0], res[1][3], res[1][1]] : ['', nil, nil]
     if res and res[0]
       code, type, data = parse_tftp_response(res[0])
-      if code == OpAck and self.action == :upload
+      if code == Constants::OpAck and self.action == :upload
         if block_given?
           yield "WRQ accepted, sending the file." if type == 0
           send_data(res[1], res[2]) {|msg| yield msg}
         else
           send_data(res[1], res[2])
         end
-      elsif code == OpData and self.action == :download
+      elsif code == Constants::OpData and self.action == :download
         if block_given?
           recv_data(res[1], res[2], data) {|msg| yield msg}
         else
           recv_data(res[1], res[2], data)
         end
-      elsif code == OpError
+      elsif code == Constants::OpError
         yield("Aborting, got error type:%d, message:'%s'" % [type, data]) if block_given?
         self.status = {:error => [code, type, data]}
       else
@@ -113,7 +113,8 @@ class Client
   end
 
   def monitor_client_sock
-    res = self.client_sock.recvfrom(65535)
+    res = self.client_sock.timed_recvfrom(65535)
+    res = res ? [res[0], res[1][3], res[1][1]] : ['', nil, nil]
     if res[1] # Got a response back, so that's never good; Acks come back on server_sock.
       code, type, data = parse_tftp_response(res[0])
       yield("Aborting, got code:%d, type:%d, message:'%s'" % [code, type, data]) if block_given?
@@ -140,13 +141,13 @@ class Client
   #
 
   def rrq_packet
-    req = [OpRead, self.remote_file, self.mode]
+    req = [Constants::OpRead, self.remote_file, self.mode]
     packstr = "na#{self.remote_file.length+1}a#{self.mode.length+1}"
     req.pack(packstr)
   end
 
   def ack_packet(blocknum=0)
-    req = [OpAck, blocknum].pack("nn")
+    req = [Constants::OpAck, blocknum].pack("nn")
   end
 
   def send_read_request(&block)
@@ -164,7 +165,7 @@ class Client
       'LocalPort' => local_port,
       'Context'   => context
     )
-    self.client_sock.sendto(rrq_packet, peer_host, peer_port)
+    self.client_sock.send(rrq_packet, 0, peer_host, peer_port)
     self.threads << Rex::ThreadFactory.spawn("TFTPClientMonitor", false) {
       if block_given?
         monitor_client_sock {|msg| yield msg}
@@ -191,7 +192,8 @@ class Client
     end
     current_block = first_block
     while current_block.size == 512
-      res = self.server_sock.recvfrom(65535)
+      res = self.server_sock.timed_recvfrom(65535)
+      res = res ? [res[0], res[1][3], res[1][1]] : ['', nil, nil]
       if res and res[0]
         code, block_num, current_block = parse_tftp_response(res[0])
         if code == 3
@@ -224,7 +226,7 @@ class Client
     self.recv_tempfile.write(data)
     self.recv_tempfile.flush
     req = ack_packet(blocknum)
-    self.server_sock.sendto(req, host, port)
+    self.server_sock.send(req, 0, host, port)
     yield "Received and acknowledged #{data.size} in block #{blocknum}" if block_given?
   end
 
@@ -233,7 +235,7 @@ class Client
   #
 
   def wrq_packet
-    req = [OpWrite, self.remote_file, self.mode]
+    req = [Constants::OpWrite, self.remote_file, self.mode]
     packstr = "na#{self.remote_file.length+1}a#{self.mode.length+1}"
     req.pack(packstr)
   end
@@ -272,7 +274,7 @@ class Client
       'LocalPort' => local_port,
       'Context'   => context
     )
-    self.client_sock.sendto(wrq_packet, peer_host, peer_port)
+    self.client_sock.send(wrq_packet, 0, peer_host, peer_port)
     self.threads << Rex::ThreadFactory.spawn("TFTPClientMonitor", false) {
       if block_given?
         monitor_client_sock {|msg| yield msg}
@@ -304,8 +306,8 @@ class Client
     end
     data_blocks.each_with_index do |data_block,idx|
       loop do
-        req = [OpData, (idx + 1), data_block].pack("nnA*")
-        if self.server_sock.sendto(req, host, port) <= 0
+        req = [Constants::OpData, (idx + 1), data_block].pack("nnA*")
+        if self.server_sock.send(req, 0, host, port) <= 0
           send_retries += 1
           if send_retries > 100
             break
@@ -314,7 +316,8 @@ class Client
           end
         end
         send_retries = 0
-        res = self.server_sock.recvfrom(65535)
+        res = self.server_sock.timed_recvfrom(65535)
+        res = res ? [res[0], res[1][3], res[1][1]] : ['', nil, nil]
         if res
           code, type, msg = parse_tftp_response(res[0])
           if code == 4

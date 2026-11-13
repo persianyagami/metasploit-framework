@@ -1,5 +1,4 @@
 # -*- coding: binary -*-
-require 'msf/base'
 
 module Msf
 module Sessions
@@ -82,6 +81,10 @@ class Pingback
   #
   def desc
     "Pingback"
+  end
+
+  def self.can_cleanup_files
+    false
   end
 
   #

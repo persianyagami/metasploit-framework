@@ -1,5 +1,6 @@
 # -*- coding: binary -*-
 
+require 'rex/io/stream_abstraction'
 require 'rex/post/meterpreter/channels/pool'
 require 'rex/post/meterpreter/extensions/stdapi/tlv'
 
@@ -77,15 +78,6 @@ class StreamPool < Rex::Post::Meterpreter::Channels::Pool
     else
       return false
     end
-  end
-
-  #
-  # Closes the local half of the pool stream.
-  #
-  def dio_close_handler(packet)
-    rsock.close
-
-    return super(packet)
   end
 
   #

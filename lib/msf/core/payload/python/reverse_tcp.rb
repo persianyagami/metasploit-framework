@@ -1,8 +1,5 @@
 # -*- coding: binary -*-
 
-require 'msf/core'
-require 'msf/core/payload/python/send_uuid'
-
 module Msf
 
 ###
@@ -24,7 +21,7 @@ module Payload::Python::ReverseTcp
   #
   # Generate the first stage
   #
-  def generate
+  def generate(_opts = {})
     conf = {
       port:        datastore['LPORT'],
       host:        datastore['LHOST'],

@@ -16,6 +16,7 @@ module Msf::DBManager::Loot
         return Array.wrap(Mdm::Loot.find(opts[:id]))
       end
 
+      opts = opts.clone() # protect the original caller's opts
       # Remove path from search conditions as this won't accommodate remote data
       # service usage where the client and server storage locations differ.
       opts.delete(:path)
@@ -88,7 +89,7 @@ module Msf::DBManager::Loot
     loot.name         = name if name
     loot.info         = info if info
     loot.workspace    = wspace
-    msf_import_timestamps(opts,loot)
+    msf_assign_timestamps(opts, loot)
     loot.save!
 
     ret[:loot] = loot
@@ -114,7 +115,7 @@ module Msf::DBManager::Loot
 
       # If the user updates the path attribute (or filename) we need to update the file
       # on disk to reflect that.
-      if opts[:path] && File.exists?(loot.path)
+      if opts[:path] && File.exist?(loot.path)
         File.rename(loot.path, opts[:path])
       end
 

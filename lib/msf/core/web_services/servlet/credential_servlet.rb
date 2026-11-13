@@ -1,19 +1,19 @@
-module CredentialServlet
+module Msf::WebServices::CredentialServlet
 
   def self.api_path
     '/api/v1/credentials'
   end
 
   def self.api_path_with_id
-    "#{CredentialServlet.api_path}/?:id?"
+    "#{self.api_path}/?:id?"
   end
 
   def self.registered(app)
-    app.get CredentialServlet.api_path, &get_credentials
-    app.get CredentialServlet.api_path_with_id, &get_credentials
-    app.post CredentialServlet.api_path, &create_credential
-    app.put CredentialServlet.api_path_with_id, &update_credential
-    app.delete CredentialServlet.api_path, &delete_credentials
+    app.get self.api_path, &get_credentials
+    app.get self.api_path_with_id, &get_credentials
+    app.post self.api_path, &create_credential
+    app.put self.api_path_with_id, &update_credential
+    app.delete self.api_path, &delete_credentials
   end
 
   #######
@@ -57,6 +57,7 @@ module CredentialServlet
 
   def self.update_credential
     lambda {
+      warden.authenticate!
       begin
         opts = parse_json_request(request, false)
         tmp_params = sanitize_params(params)
@@ -72,6 +73,7 @@ module CredentialServlet
 
   def self.delete_credentials
     lambda {
+      warden.authenticate!
       begin
         opts = parse_json_request(request, false)
         data = get_db.delete_credentials(opts)

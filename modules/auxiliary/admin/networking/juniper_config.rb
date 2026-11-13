@@ -3,8 +3,6 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/auxiliary/juniper'
-
 class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::Juniper
   include Msf::Exploit::Deprecated
@@ -19,13 +17,17 @@ class MetasploitModule < Msf::Auxiliary
           This module imports a Juniper ScreenOS or JunOS device configuration.
         },
         'License' => MSF_LICENSE,
-        'Author' => [ 'h00die'],
-        'Actions' =>
-          [
-            ['JUNOS', 'Description' => 'Import JunOS Config File'],
-            ['SCREENOS', 'Description' => 'Import ScreenOS Config File'],
-          ],
-        'DefaultAction' => 'JUNOS'
+        'Author' => ['h00die'],
+        'Actions' => [
+          ['JUNOS', { 'Description' => 'Import JunOS Config File' }],
+          ['SCREENOS', { 'Description' => 'Import ScreenOS Config File' }],
+        ],
+        'DefaultAction' => 'JUNOS',
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [],
+          'Reliability' => []
+        }
       )
     )
 
@@ -36,12 +38,11 @@ class MetasploitModule < Msf::Auxiliary
         Opt::RPORT(22)
       ]
     )
-
   end
 
   def run
     unless ::File.exist?(datastore['CONFIG'])
-      fail_with Failure::BadConfig, "Juniper config file #{datastore['CONFIG']} does not exists!"
+      fail_with Failure::BadConfig, "Juniper config file #{datastore['CONFIG']} does not exist!"
     end
     juniper_config = ::File.open(datastore['CONFIG'], 'rb')
     print_status('Importing config')

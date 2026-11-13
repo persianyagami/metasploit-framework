@@ -1,10 +1,7 @@
 require 'json'
-require 'msf/core/web_services/db_manager_proxy'
-require 'msf/core/web_services/job_processor'
 require 'metasploit/framework/data_service/remote/http/response_data_helper'
-require 'rex/ui/text/output/stdio'
 
-module ServletHelper
+module Msf::WebServices::ServletHelper
   include ResponseDataHelper
 
   @@console_printer = Rex::Ui::Text::Output::Stdio.new
@@ -57,9 +54,13 @@ module ServletHelper
 
   def print_error_and_create_response(error: , message:, code:)
     print_error "Error handling request: #{error.message}.", error
+    create_error_response(error: error, message: message, code: code)
+  end
+
+  def create_error_response(error:, message:, code:)
     error_response = {
-        code: code,
-        message: "#{message} #{error.message}"
+      code: code,
+      message: "#{message} #{error.message}"
     }
     set_json_error_response(response: error_response, code: code)
   end
@@ -72,7 +73,7 @@ module ServletHelper
 
       exec_async = opts.delete(:exec_async)
       if (exec_async)
-        JobProcessor.instance.submit_job(opts, &job)
+        Msf::WebServices::JobProcessor.instance.submit_job(opts, &job)
         return set_empty_response
       else
         data = job.call(opts)
@@ -85,7 +86,7 @@ module ServletHelper
   end
 
   def get_db
-    DBManagerProxy.instance.db
+    Msf::WebServices::DBManagerProxy.instance.db
   end
 
   # Sinatra injects extra parameters for some reason: https://github.com/sinatra/sinatra/issues/453
@@ -101,7 +102,7 @@ module ServletHelper
     if query_hash.key?('id')
       raise ArgumentError, ("'id' is not a valid query parameter. Please use /api/v1/<resource>/{ID} instead.")
     end
-    params.symbolize_keys.except(:captures, :splat)
+    params.symbolize_keys.except(:captures, :splat).to_h.symbolize_keys
   end
 
   # Determines if this data set should be output as a single object instead of an array.

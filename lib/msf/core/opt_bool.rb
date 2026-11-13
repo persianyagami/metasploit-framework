@@ -8,7 +8,7 @@ module Msf
 
     # This overrides default from 'nil' to 'false'
     def initialize(in_name, attrs = [],
-                   required: true, desc: nil, default: false, aliases: [])
+                   default: false, **kwargs)
       super
     end
 
@@ -16,7 +16,7 @@ module Msf
       return 'bool'
     end
 
-    def valid?(value, check_empty: true)
+    def valid?(value, check_empty: true, datastore: nil)
       return false if check_empty && empty_required_value?(value)
       return true if value.nil? && !required?
 

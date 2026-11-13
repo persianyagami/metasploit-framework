@@ -1,19 +1,19 @@
-module LootServlet
+module Msf::WebServices::LootServlet
 
   def self.api_path
     '/api/v1/loots'
   end
 
   def self.api_path_with_id
-    "#{LootServlet.api_path}/?:id?"
+    "#{self.api_path}/?:id?"
   end
 
   def self.registered(app)
-    app.get LootServlet.api_path, &get_loot
-    app.get LootServlet.api_path_with_id, &get_loot
-    app.post LootServlet.api_path, &report_loot
-    app.put LootServlet.api_path_with_id, &update_loot
-    app.delete LootServlet.api_path, &delete_loot
+    app.get self.api_path, &get_loot
+    app.get self.api_path_with_id, &get_loot
+    app.post self.api_path, &report_loot
+    app.put self.api_path_with_id, &update_loot
+    app.delete self.api_path, &delete_loot
   end
 
   #######
@@ -30,7 +30,9 @@ module LootServlet
         data = encode_loot_data(data)
         data = data.first if is_single_object?(data, sanitized_params)
         set_json_data_response(response: data, includes: includes)
-      rescue => e
+      rescue ActiveRecord::RecordNotFound => e
+        create_error_response(error: e, message: 'Loot record was not found', code: 404)
+      rescue StandardError => e
         print_error_and_create_response(error: e, message: 'There was an error retrieving the loot:', code: 500)
       end
     }
@@ -65,14 +67,14 @@ module LootServlet
         # Give the file a unique name to prevent accidental overwrites. Only do this if there is actually a file
         # on disk. If there is not a file on disk we assume that this DB record is for tracking a file outside
         # of metasploit, so we don't want to assign them a unique file name and overwrite that.
-        if opts[:path] && File.exists?(db_record.path)
+        if opts[:path] && File.exist?(db_record.path)
           filename = File.basename(opts[:path])
           opts[:path] = File.join(Msf::Config.loot_directory, "#{SecureRandom.hex(10)}-#{filename}")
         end
         data = get_db.update_loot(opts)
         data = encode_loot_data(data)
         set_json_data_response(response: data)
-      rescue => e
+      rescue StandardError => e
         print_error_and_create_response(error: e, message: 'There was an error updating the loot:', code: 500)
       end
     }
@@ -89,7 +91,7 @@ module LootServlet
         data.map! { |loot| loot.dup if loot.frozen? }
         data = encode_loot_data(data)
         set_json_data_response(response: data)
-      rescue => e
+      rescue StandardError => e
         print_error_and_create_response(error: e, message: 'There was an error deleting the loot:', code: 500)
       end
     }

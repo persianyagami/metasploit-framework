@@ -1,5 +1,4 @@
 # -*- coding: binary -*-
-require 'msf/core'
 
 ###
 #
@@ -162,8 +161,6 @@ class Msf::Author
       end
     end
 
-    self.name.strip! if self.name.present?
-
     # The parse succeeds only when a name is found
     self.name.present?
   end
@@ -171,6 +168,7 @@ class Msf::Author
   # Sets the name of the author and updates the email if it's a known author.
   # @param name [String] the name to set
   def name=(name)
+    name = name.strip if name.present?
     if KNOWN.has_key?(name)
       self.email = KNOWN[name]
     end

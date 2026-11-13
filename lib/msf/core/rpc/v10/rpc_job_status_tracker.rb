@@ -7,6 +7,7 @@ module Msf
       include MonitorMixin
 
       def initialize
+        super
         @ready = Set.new
         @running = Set.new
         # Can be expanded upon later to allow the option of a MemCacheStore being backed by redis for example
@@ -14,59 +15,85 @@ module Msf
       end
 
       def waiting(id)
-        ready << id
+        synchronize do
+          ready << id
+        end
       end
 
       def start(id)
-        running << id
-        ready.delete(id)
+        synchronize do
+          running << id
+          ready.delete(id)
+        end
       end
 
       def completed(id, result, mod)
-        add_result(id, { result: result }, mod)
+        synchronize do
+          add_result(id, { result: result }, mod)
+        end
       end
 
       def failed(id, error, mod)
-        add_result(id, { error: error.to_s }, mod)
+        synchronize do
+          add_result(id, { error: error.to_s }, mod)
+        end
       end
 
       def running?(id)
-        running.include? id
+        synchronize do
+          running.include? id
+        end
       end
 
       def waiting?(id)
-        ready.include? id
+        synchronize do
+          ready.include? id
+        end
       end
 
       def finished?(id)
-        results.exist? id
+        synchronize do
+          results.exist? id
+        end
       end
 
       def result(id)
-        result = results.fetch(id)
-        return unless result
+        synchronize do
+          result = results.fetch(id)
+          return unless result
 
-        ::JSON.parse(result).with_indifferent_access
+          ::JSON.parse(result).with_indifferent_access
+        end
       end
 
       def delete(id)
-        results.delete(id)
+        synchronize do
+          results.delete(id)
+        end
       end
 
       def result_ids
-        results.keys
+        synchronize do
+          results.keys
+        end
       end
 
       def waiting_ids
-        ready.to_a
+        synchronize do
+          ready.to_a
+        end
       end
 
       def running_ids
-        running.to_a
+        synchronize do
+          running.to_a
+        end
       end
 
       def data
-        results.data
+        synchronize do
+          results.data
+        end
       end
 
       alias ack delete
@@ -74,7 +101,8 @@ module Msf
       private
 
       def add_result(id, result, mod)
-        string = result.to_json
+        sanitized = result.transform_values { |v| json_safe(v) }
+        string = sanitized.to_json
         results.write(id, string)
       rescue ::Exception => e
         wlog("Job with id: #{id} finished but the result could not be stored")
@@ -82,6 +110,35 @@ module Msf
         add_fallback_result(id, mod)
       ensure
         running.delete(id)
+      end
+
+      # Framework objects (Session, LoginScanner::Result) hold cyclic refs that blow to_json's stack.
+      def json_safe(value)
+        case value
+        when nil, true, false, Numeric, String, Symbol
+          value
+        when Msf::Exploit::CheckCode
+          value
+        when Hash
+          value.each_with_object({}) { |(k, v), h| h[json_safe(k)] = json_safe(v) }
+        when Array
+          value.map { |v| json_safe(v) }
+        else
+          stringify_unknown(value)
+        end
+      end
+
+      # Convert an unrecognised value to a JSON-safe string. Guards against
+      # `to_s` implementations that raise, produce invalid UTF-8, or dump
+      # unbounded state. On failure the value's class name is returned instead
+      # so operators still get a diagnosable placeholder.
+      def stringify_unknown(value)
+        str = value.to_s
+        str = str.byteslice(0, 4096) if str.bytesize > 4096
+        str.valid_encoding? ? str : str.scrub
+      rescue ::Exception => e
+        class_name = (value.class.name || value.class.to_s) rescue 'UnknownClass'
+        "#<#{class_name}: unserialisable (#{e.class})>"
       end
 
       def add_fallback_result(id, mod)

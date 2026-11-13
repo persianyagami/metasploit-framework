@@ -1,7 +1,5 @@
 # -*- coding: binary -*-
 require 'thread'
-require 'msf/core/post_mixin'
-require 'rex/proto/smb/simpleclient'
 
 #
 # KNOWN ISSUES
@@ -33,7 +31,7 @@ class OpenPipeSock < Rex::Proto::SMB::SimpleClient::OpenPipe
     self.simple = simple
     self.client = simple.client
     self.mutex = Mutex.new      # synchronize read/writes
-    self.last_comm = Time.now   # last successfull read/write
+    self.last_comm = Time.now   # last successful read/write
     self.write_queue = Queue.new # messages to send
     self.write_thread = Thread.new { dispatcher }
     self.echo_thread = Thread.new { force_read }
@@ -209,9 +207,9 @@ module Msf
             OptString.new('PIPENAME', [true, 'Name of the pipe to connect to', 'msf-pipe']),
             OptString.new('RHOST', [false, 'Host of the pipe to connect to', '']),
             OptPort.new('LPORT', [true, 'SMB port', 445]),
-            OptString.new('SMBUser', [false, 'The username to authenticate as', '']),
-            OptString.new('SMBPass', [false, 'The password for the specified username', '']),
-            OptString.new('SMBDomain', [false, 'The Windows domain to use for authentication', '.']),
+            OptString.new('SMBUser', [false, 'The username to authenticate as', ''], fallbacks: ['USERNAME']),
+            OptString.new('SMBPass', [false, 'The password for the specified username', ''], fallbacks: ['PASSWORD']),
+            OptString.new('SMBDomain', [false, 'The Windows domain to use for authentication', '.'], fallbacks: ['DOMAIN']),
           ], Msf::Handler::BindNamedPipe)
         register_advanced_options(
           [
@@ -286,7 +284,8 @@ module Msf
 
           if not sock
             print_error("Failed to connect socket #{rhost}:#{lport}")
-            exit
+            interrupt_wait_for_session
+            Thread.exit
           end
 
           # Perform SMB logon
@@ -297,7 +296,8 @@ module Msf
             vprint_status("SMB login Success #{smbdomain}\\#{smbuser}:#{smbpass} #{rhost}:#{lport}")
           rescue
             print_error("SMB login Failure #{smbdomain}\\#{smbuser}:#{smbpass} #{rhost}:#{lport}")
-            exit
+            interrupt_wait_for_session
+            Thread.exit
           end
 
           # Connect to the IPC$ share so we can use named pipes.
@@ -316,7 +316,8 @@ module Msf
               error_name = e.get_error(e.error_code)
               unless ['STATUS_OBJECT_NAME_NOT_FOUND', 'STATUS_PIPE_NOT_AVAILABLE'].include? error_name
                 print_error("Error connecting to #{pipe_name}: #{error_name}")
-                exit
+                interrupt_wait_for_session
+                Thread.exit
               else
                 # Stager pipe may not be ready
                 vprint_status("Error connecting to #{pipe_name}: #{error_name}")
@@ -331,7 +332,8 @@ module Msf
 
           if not pipe
             print_error("Failed to connect to pipe \\#{pipe_name} on #{rhost}")
-            exit
+            interrupt_wait_for_session
+            Thread.exit
           end
 
           vprint_status("Opened pipe \\#{pipe_name}")

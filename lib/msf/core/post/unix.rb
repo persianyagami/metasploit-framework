@@ -1,6 +1,5 @@
 # -*- coding: binary -*-
 
-require 'msf/core/post/linux/system'
 
 module Msf::Post::Unix
 
@@ -9,6 +8,14 @@ module Msf::Post::Unix
   #
   def is_root?
     (cmd_exec('id -u').to_s.gsub(/[^\d]/, '') == '0')
+  end
+
+  #
+  # Gets the pid of the current session
+  # @return [String]
+  #
+  def get_session_pid
+    cmd_exec("echo $PPID").to_s
   end
 
   #
@@ -74,7 +81,7 @@ module Msf::Post::Unix
     passwd = '/etc/passwd'
     if file_exist?(passwd)
       read_file(passwd).each_line do |passwd_line|
-        user_dirs << passwd_line.split(/:/)[5]
+        user_dirs << passwd_line.split(':')[5]
       end
     end
 
@@ -82,9 +89,9 @@ module Msf::Post::Unix
     # the users aren't in /etc/passwd (LDAP, for example)
     case session.platform
     when 'osx'
-      user_dirs << cmd_exec('ls /Users').each_line.map { |l| "/Users/#{l}" }
+      user_dirs << cmd_exec('ls /Users').each_line.map { |l| "/Users/#{l.chomp}" }
     else
-      user_dirs << cmd_exec('ls /home').each_line.map { |l| "/home/#{l}" }
+      user_dirs << cmd_exec('ls /home').each_line.map { |l| "/home/#{l.chomp}" }
     end
 
     user_dirs.flatten!
@@ -100,8 +107,8 @@ module Msf::Post::Unix
   #
   def whoami
     shellpid = get_session_pid()
-    statuspid = pid_uid(shellpid)
-    statuspid.each_line do |line|
+    status = read_file("/proc/#{shellpid}/status")
+    status.each_line do |line|
       split = line.split(":")
       if split[0] == "Uid"
         regex = /.*\s(.*)\s/

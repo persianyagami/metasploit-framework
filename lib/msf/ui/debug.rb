@@ -10,8 +10,73 @@ module Msf
     ###
     module Debug
       COMMAND_HISTORY_TOTAL = 50
-      ERROR_TOTAL = 10
-      LOG_LINE_TOTAL = 50
+      FRAMEWORK_LOG_LINE_TOTAL = 50
+      WEB_SERVICE_LOG_LINE_TOTAL = 150
+
+      # "[mm/dd/yyyy hh:mm:ss] [e([ANY_NUMBER])]" Indicates the start of an error message
+      # The end of an error message is indicated by the start of the next log message [mm/dd/yyyy hh:mm:ss] [[ANY_LETTER]([ANY_NUMBER])]
+      #
+      #
+      # When using the commented regex, the below example framework.log will only return three separate errors, and their accompanying traces:
+      #
+      # [05/15/2020 14:13:38] [e(0)] core: [-] Error during IRB: undefined method `[]' for nil:NilClass
+      #
+      # [06/19/2020 12:05:02] [i(0)] core: Trying to continue despite failed database creation: could not connect to server: Connection refused
+      # 	Is the server running on host "127.0.0.1" and accepting
+      # 	TCP/IP connections on port 5433?
+      #
+      # [05/15/2020 14:19:20] [e(0)] core: [-] Error while running command debug: can't modify frozen String
+      # Call stack:
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/ui/debug.rb:33:in `get_all'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/ui/console/command_dispatcher/core.rb:318:in `cmd_debug'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:523:in `run_command'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:474:in `block in run_single'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:468:in `each'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:468:in `run_single'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/shell.rb:158:in `run'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/metasploit/framework/command/console.rb:48:in `start'
+      # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/metasploit/framework/command/base.rb:82:in `start'
+      #
+      # [06/19/2020 11:51:44] [d(2)] core: Stager osx/armle/reverse_tcp and stage osx/x64/meterpreter have incompatible architectures: armle - x64
+      #
+      # [05/15/2020 14:23:55] [e(0)] core: [-] Error during IRB: undefined method `[]' for nil:NilClass
+      FRAMEWORK_ERROR_REGEX = %r|\[\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}\] \[e\(\d+\)\] (?:(?!\[\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}\] \[[A-Za-z]\(\d+\)\]).)+|m
+      FRAMEWORK_ERROR_TOTAL = 10
+
+      # "[-]" Indicates the start of an error message
+      # The end of an error message is indicated by a \n character followed by any non-whitespace character
+      #
+      # When using the commented regex, the below example msf-ws.log will only return three separate errors, and their accompanying traces:
+      #
+      # [-] Error that does not return a stack trace.
+      # Writing PID to /Users/agalway/.msf4/msf-ws.pid
+      # Thin web server (v1.7.2 codename Bachmanity)
+      # Maximum connections set to 1024
+      # Listening on localhost:5443, CTRL+C to stop
+      #
+      #
+      # [-] Error handling request: wrong number of arguments (given 4, expected 1).
+      #     Call Stack:
+      #      /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/core/db_manager/service.rb:44:in `get_service'
+      #      /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/core/db_manager/note.rb:136:in `block in report_note'
+      #      /Users/agalway/vendor/bundle/gems/activerecord-5.2.4.4/lib/active_record/connection_adapters/abstract/connection_pool.rb:416:in `with_connection'
+      #      /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/core/db_manager/note.rb:81:in `report_note'
+      #      /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/core/web_services/servlet/note_servlet.rb:42:in `block (2 levels) in report_note'
+      #      /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/core/web_services/servlet_helper.rb:78:in `exec_report_job'
+      #      /Users/agalway/vendor/bundle/gems/thin-1.7.2/bin/thin:6:in `<top (required)>'
+      #      /Users/agalway/vendor/bundle/bin/thin:23:in `load'
+      #      /Users/agalway/vendor/bundle/bin/thin:23:in `<main>'
+      # [-] Error handling request: wrong number of arguments (given 4, expected 1).
+      #     Call Stack:
+      #      /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/core/db_manager/service.rb:44:in `get_service'
+      #      /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/core/db_manager/note.rb:136:in `block in report_note'
+      #      /Users/agalway/vendor/bundle/gems/activerecord-5.2.4.4/lib/active_record/connection_adapters/abstract/connection_pool.rb:416:in `with_connection'
+      #      /Users/agalway/vendor/bundle/gems/thin-1.7.2/bin/thin:6:in `<top (required)>'
+      #      /Users/agalway/vendor/bundle/bin/thin:23:in `load'
+      #      /Users/agalway/vendor/bundle/bin/thin:23:in `<main>'
+      WEB_SERVICE_ERROR_REGEX = %r|\[-\].+?\n(?!\s)|m
+      WEB_SERVICE_ERROR_TOTAL = 10
+
       ISSUE_LINK = 'https://github.com/rapid7/metasploit-framework/issues/new/choose'
       PREAMBLE = <<~PREMABLE
         Please provide the below information in any Github issues you open. New issues can be opened here #{ISSUE_LINK.dup}
@@ -21,6 +86,8 @@ module Msf
 
 
       PREMABLE
+
+      ERROR_BLURB = 'An error occurred when trying to build this section:'
 
       def self.issue_link
         return ISSUE_LINK.dup
@@ -33,6 +100,8 @@ module Msf
       def self.all(framework, driver)
         all_information = preamble
         all_information << datastore(framework, driver)
+        all_information << database_configuration(framework)
+        all_information << framework_config(framework)
         all_information << history(driver)
         all_information << errors
         all_information << logs
@@ -54,11 +123,11 @@ module Msf
         end
 
         # Retrieve and add more up to date information
-        add_hash_to_ini_group(ini, framework.datastore, driver.get_config_core)
+        add_hash_to_ini_group(ini, framework.datastore.to_h, driver.get_config_core)
         add_hash_to_ini_group(ini, driver.get_config, driver.get_config_group)
 
         if driver.active_module
-          add_hash_to_ini_group(ini, driver.active_module.datastore.dup, driver.active_module.refname)
+          add_hash_to_ini_group(ini, driver.active_module.datastore.to_h, driver.active_module.refname)
         end
 
         # Filter credentials
@@ -80,7 +149,74 @@ module Msf
           content
         )
       rescue StandardError => e
-        section_build_error('Failed to extract Datastore', e)
+        build_section(
+          'Module/Datastore',
+          ERROR_BLURB,
+          section_build_error('Failed to extract Datastore', e)
+        )
+      end
+
+      def self.database_configuration(framework)
+        output = "```\nSession Type: #{db_connection_info(framework)}\n```\n\n"
+
+        if framework.db&.active
+          current_workspace = framework.db.workspace
+          example_workspaces = ::Mdm::Workspace.order(id: :desc).take(10)
+          ordered_workspaces = ([current_workspace] + example_workspaces).uniq.sort_by(&:id)
+          workspace_rows = ordered_workspaces.map do |workspace|
+            id = current_workspace.id == workspace.id ? "#{workspace.id.to_fs(:delimited)} **(Current)**" : workspace.id.to_fs(:delimited)
+            [
+              id,
+              workspace.hosts.count.to_fs(:delimited),
+              workspace.vulns.count.to_fs(:delimited),
+              workspace.notes.count.to_fs(:delimited),
+              workspace.services.count.to_fs(:delimited)
+            ]
+          end
+
+          totals_row = [
+            "**Total (#{::Mdm::Workspace.count.to_fs(:delimited)})**",
+            "**#{::Mdm::Host.count.to_fs(:delimited)}**",
+            "**#{::Mdm::Vuln.count.to_fs(:delimited)}**",
+            "**#{::Mdm::Note.count.to_fs(:delimited)}**",
+            "**#{::Mdm::Service.count.to_fs(:delimited)}**"
+          ]
+
+          table = "| ID | Hosts | Vulnerabilities | Notes | Services |\n"
+          table += "|-:|-:|-:|-:|-:|\n"
+          table += (workspace_rows + [totals_row]).map { |x| "| #{x.join(" | ")} |" }.join("\n")
+          output += table
+        end
+
+        # The markdown table can't be placed in a code block or it will not render as a table.
+        build_section_no_block(
+          'Database Configuration',
+          'The database contains the following information:',
+          output
+        )
+      rescue StandardError => e
+        build_section(
+          'Database Configuration',
+          ERROR_BLURB,
+          section_build_error('Failed to extract Database configuration', e)
+        )
+      end
+
+      def self.framework_config(framework)
+        required_features = framework.features.all.map { |feature| [feature[:name], feature[:enabled].to_s] }
+        markdown_formatted_features = required_features.map { |feature| "| #{feature.join(' | ')} |" }
+        required_fields = %w[name enabled]
+
+        table = "| #{required_fields.join(' | ')} |\n"
+        table += '|' + '-:|' * required_fields.count + "\n"
+        table += markdown_formatted_features.join("\n").to_s
+
+        # The markdown table can't be placed in a code block or it will not render as a table.
+        build_section_no_block(
+          'Framework Configuration',
+          'The features are configured as follows:',
+          table
+        )
       end
 
       def self.history(driver)
@@ -100,79 +236,39 @@ module Msf
           commands
         )
       rescue StandardError => e
-        section_build_error('Failed to extract History', e)
+        build_section(
+          'History',
+          ERROR_BLURB,
+          section_build_error('Failed to extract History', e)
+        )
       end
 
       def self.errors
+        errors = build_regex_file_section(Pathname.new(Msf::Config.log_directory).join('framework.log'),
+                                                            FRAMEWORK_ERROR_TOTAL,
+                                                            FRAMEWORK_ERROR_REGEX,
+                                                            'Framework Errors',
+                                                            'The following framework errors occurred before the issue occurred:')
 
-        errors = File.read(File.join(Msf::Config.log_directory, 'framework.log'))
-
-        # Returns any error logs in framework.log file as an array
-        # "[mm/dd/yyyy hh:mm:ss] [e([ANY_NUMBER])]" Indicates the start of an error message
-        # The end of an error message is indicated by the start of the next log message [mm/dd/yyyy hh:mm:ss] [[ANY_LETTER]([ANY_NUMBER])]
-        #
-        #
-        # The below example framework.log will only return three separate errors, and their accompanying traces:
-        #
-        # [05/15/2020 14:13:38] [e(0)] core: [-] Error during IRB: undefined method `[]' for nil:NilClass
-        #
-        # [06/19/2020 12:05:02] [i(0)] core: Trying to continue despite failed database creation: could not connect to server: Connection refused
-        # 	Is the server running on host "127.0.0.1" and accepting
-        # 	TCP/IP connections on port 5433?
-        #
-        # [05/15/2020 14:19:20] [e(0)] core: [-] Error while running command debug: can't modify frozen String
-        # Call stack:
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/ui/debug.rb:33:in `get_all'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/msf/ui/console/command_dispatcher/core.rb:318:in `cmd_debug'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:523:in `run_command'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:474:in `block in run_single'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:468:in `each'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/dispatcher_shell.rb:468:in `run_single'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/rex/ui/text/shell.rb:158:in `run'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/metasploit/framework/command/console.rb:48:in `start'
-        # /Users/Shared/Relocated_Items/Security/rapid7/metasploit-framework/lib/metasploit/framework/command/base.rb:82:in `start'
-        #
-        # [06/19/2020 11:51:44] [d(2)] core: Stager osx/armle/reverse_tcp and stage osx/x64/meterpreter have incompatible architectures: armle - x64
-        #
-        # [05/15/2020 14:23:55] [e(0)] core: [-] Error during IRB: undefined method `[]' for nil:NilClass
-        res = errors.scan(%r|\[\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}\] \[e\(\d+\)\] (?:(?!\[\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}\] \[[A-Za-z]\(\d+\)\]).)+|m)
-
-        if res.empty?
-          return build_section(
-            'Errors',
-            'The following errors occurred before the issue occurred:',
-            'The error log file was empty'
-          )
-        end
-
-        # Scan returns each error as a single item array
-        res.flatten!
-
-        errors_str = concat_str_array_from_last_idx(res, ERROR_TOTAL)
-        build_section(
-          'Errors',
-          'The following errors occurred before the issue occurred:',
-          errors_str
-        )
-      rescue StandardError => e
-        section_build_error('Failed to extract Errors', e)
-
+        errors += build_regex_file_section(Pathname.new(Msf::Config.log_directory).join('msf-ws.log'),
+                                                              WEB_SERVICE_ERROR_TOTAL,
+                                                              WEB_SERVICE_ERROR_REGEX,
+                                                              'Web Service Errors',
+                                                              'The following web service errors occurred before the issue occurred:')
+        errors
       end
 
       def self.logs
+        logs = build_file_section(Pathname.new(Msf::Config.log_directory).join('framework.log'),
+                                                   FRAMEWORK_LOG_LINE_TOTAL,
+                                                  'Framework Logs',
+                                                  'The following framework logs were recorded before the issue occurred:')
 
-        log_lines = File.readlines(File.join(Msf::Config.log_directory, 'framework.log'))
-
-        logs_str = concat_str_array_from_last_idx(log_lines, LOG_LINE_TOTAL)
-
-        build_section(
-          'Logs',
-          'The following logs were recorded before the issue occurred:',
-          logs_str
-        )
-      rescue StandardError => e
-        section_build_error('Failed to extract Logs', e)
-
+        logs += build_file_section(Pathname.new(Msf::Config.log_directory).join('msf-ws.log'),
+                                                     WEB_SERVICE_LOG_LINE_TOTAL,
+                                                    'Web Service Logs',
+                                                    'The following web service logs were recorded before the issue occurred:')
+        logs
       end
 
       def self.versions(framework)
@@ -180,6 +276,7 @@ module Msf
         str = <<~VERSIONS
           Framework: #{framework.version}
           Ruby: #{RUBY_DESCRIPTION}
+          OpenSSL: #{OpenSSL::OPENSSL_VERSION}
           Install Root: #{Msf::Config.install_root}
           Session Type: #{db_connection_info(framework)}
           Install Method: #{installation_method}
@@ -187,12 +284,84 @@ module Msf
 
         build_section('Version/Install', 'The versions and install method of your Metasploit setup:', str)
       rescue StandardError => e
-        section_build_error('Failed to extract Versions', e)
+        build_section(
+          'Version/Install',
+          ERROR_BLURB,
+          section_build_error('Failed to extract Versions', e)
+        )
       end
 
       class << self
 
         private
+
+        def build_regex_file_section(path, match_total, regex, header_name, blurb)
+          unless File.file?(path)
+            return build_section(
+              header_name,
+              blurb,
+              "#{path.basename.to_s} does not exist."
+            )
+          end
+
+          file_contents = File.read(path)
+          matches = file_contents.scan(regex)
+
+          if matches.empty?
+            return build_section(
+              header_name,
+              blurb,
+              "No matching patterns were found in #{path.basename}."
+            )
+          end
+
+          # +.scan+ can sometimes return each match as a single item array
+          matches.flatten!
+
+          # create a string consisting of the last +match_total+ matches
+          # if +matches.length+ < +match_total+ then concat all matches
+          str = concat_str_array_from_last_idx(matches, match_total)
+
+          build_section(
+            header_name,
+            blurb,
+            str
+          )
+        rescue StandardError => e
+          build_section(
+            header_name,
+            ERROR_BLURB,
+            section_build_error("Failed to extract matches from #{path.basename}", e)
+          )
+        end
+
+        def build_file_section(path, line_total, header_name, blurb)
+          unless File.file?(path)
+            return build_section(
+              header_name,
+              blurb,
+              "#{path.basename.to_s} does not exist."
+            )
+          end
+
+          log_lines = File.readlines(path)
+
+          # create a string consisting of the last +line_total+ lines
+          # if +log_lines.length+ < +line_total+ then concat all lines
+          str = concat_str_array_from_last_idx(log_lines, line_total)
+
+          build_section(
+            header_name,
+            blurb,
+            str
+          )
+        rescue StandardError => e
+          build_section(
+            header_name,
+            ERROR_BLURB,
+            section_build_error("Failed to extract contents of #{path.basename.to_s}", e)
+          )
+        end
 
         def add_hash_to_ini_group(ini, hash, group_name)
           if hash.empty?
@@ -240,8 +409,6 @@ module Msf
             output = "Connected to #{cdb}. Connection type: #{framework.db.driver}."
           end
 
-          output += " Connection name: #{framework.db.get_data_service}." if framework.db.get_data_service
-
           output
         end
 
@@ -266,6 +433,28 @@ module Msf
 
             </details>
           WRAPPER
+        end
+
+        def with_collapsible_wrapper_no_block(content)
+          <<~WRAPPER
+            <details>
+            <summary>Collapse</summary>
+
+            #{content}
+
+            </details>
+          WRAPPER
+        end
+
+        # Useful for building tables or other content that can't be placed inside a code block.
+        def build_section_no_block(header_name, blurb, content)
+          <<~SECTION
+            ##  %grn#{header_name.strip}%clr
+
+            #{blurb.strip}
+            #{with_collapsible_wrapper_no_block(content.strip)}
+
+          SECTION
         end
 
         def installation_method

@@ -2,9 +2,7 @@
 #
 # Project
 #
-require 'msf/core/modules/loader'
-require 'msf/core/modules/error'
-
+require 'msf/core/constants'
 # Responsible for loading modules for {Msf::ModuleManager}.
 #
 # @abstract Subclass and override {#each_module_reference_name}, {#loadable?}, {#module_path}, and
@@ -24,6 +22,7 @@ class Msf::Modules::Loader::Base
     Msf::MODULE_POST => 'post',
     Msf::MODULE_EVASION => 'evasion'
   }
+  TYPE_BY_DIRECTORY = DIRECTORY_BY_TYPE.invert
   # This must calculate the first line of the NAMESPACE_MODULE_CONTENT string so that errors are reported correctly
   NAMESPACE_MODULE_LINE = __LINE__ + 4
   # By calling module_eval from inside the module definition, the lexical scope is captured and available to the code in
@@ -108,12 +107,17 @@ class Msf::Modules::Loader::Base
   #
   # @see #read_module_content
   # @see Msf::ModuleManager::Loading#file_changed?
-  def load_module(parent_path, type, module_reference_name, options={})
-    options.assert_valid_keys(:count_by_type, :force, :recalculate_by_type, :reload)
+  def load_module(parent_path, type, module_reference_name, options = {})
+    options.assert_valid_keys(:count_by_type, :force, :recalculate_by_type, :reload, :cached_metadata)
     force = options[:force] || false
     reload = options[:reload] || false
 
-    module_path = self.module_path(parent_path, type, module_reference_name)
+    if options[:cached_metadata]
+      module_path = options[:cached_metadata].path
+    else
+      module_path = self.module_path(parent_path, type, module_reference_name)
+    end
+
     file_changed = module_manager.file_changed?(module_path)
 
     unless force or file_changed
@@ -124,7 +128,7 @@ class Msf::Modules::Loader::Base
 
     reload ||= force || file_changed
 
-    module_content = read_module_content(parent_path, type, module_reference_name)
+    module_content = read_module_content_from_path(module_path)
 
     if module_content.empty?
       # read_module_content is responsible for calling {#load_error}, so just return here.
@@ -184,6 +188,13 @@ class Msf::Modules::Loader::Base
         causal_message:        'invalid module filename (must be lowercase alphanumeric snake case)'
       ))
       return false
+    rescue => e
+      load_error(module_path, Msf::Modules::Error.new(
+        module_path:           module_path,
+        module_reference_name: module_reference_name,
+        causal_message:        "unknown error #{e.message}"
+      ))
+      return false
     end
 
 
@@ -201,7 +212,8 @@ class Msf::Modules::Loader::Base
             'paths' => [
                 module_reference_name
             ],
-            'type' => type
+            'type' => type,
+            'cached_metadata' => options[:cached_metadata]
         }
     )
 
@@ -236,7 +248,7 @@ class Msf::Modules::Loader::Base
   # @return [Hash{String => Integer}] Maps module type to number of
   #   modules loaded
   def load_modules(path, options={})
-    options.assert_valid_keys(:force)
+    options.assert_valid_keys(:force, :recalculate)
 
     force = options[:force]
     count_by_type = {}
@@ -252,11 +264,12 @@ class Msf::Modules::Loader::Base
           :force => force
       )
     end
-
-    recalculate_by_type.each do |type, recalculate|
-      if recalculate
-        module_set = module_manager.module_set(type)
-        module_set.recalculate
+    if options[:recalculate]
+      recalculate_by_type.each do |type, recalculate|
+        if recalculate
+          module_set = module_manager.module_set(type)
+          module_set.recalculate
+        end
       end
     end
 
@@ -280,7 +293,7 @@ class Msf::Modules::Loader::Base
       original_metasploit_class = original_metasploit_class_or_instance
     end
 
-    namespace_module = original_metasploit_class.parent
+    namespace_module = original_metasploit_class.module_parent
     parent_path = namespace_module.parent_path
 
     type = original_metasploit_class.type
@@ -442,7 +455,7 @@ class Msf::Modules::Loader::Base
   #
   # @abstract Override to return the path to the module on the file system so that errors can be reported correctly.
   #
-  # @param path (see #load_module)
+  # @param parent_path (see #load_module)
   # @param type (see #load_module)
   # @param module_reference_name (see #load_module)
   # @return [String] The path to module.
@@ -459,15 +472,17 @@ class Msf::Modules::Loader::Base
   #                   the path is not hidden (starts with '.')
   # @return [false] otherwise
   def module_path?(path)
-    !(path.starts_with?(".") ||
-      !path.ends_with?(MODULE_EXTENSION) ||
-      path.match?(UNIT_TEST_REGEX))
+    path.end_with?(MODULE_EXTENSION) &&
+      File.file?(path) &&
+      !path.start_with?(".") &&
+      !path.match?(UNIT_TEST_REGEX) &&
+      !script_path?(path)
   end
 
   # Tries to determine if a file might be executable,
   def script_path?(path)
-    File.executable?(path) &&
-      !File.directory?(path) &&
+    File.file?(path) &&
+      File.executable?(path) &&
       ['#!', '//'].include?(File.read(path, 2))
   end
 
@@ -534,7 +549,7 @@ class Msf::Modules::Loader::Base
     relative_name = namespace_module_names.last
 
     if previous_namespace_module
-      parent_module = previous_namespace_module.parent
+      parent_module = previous_namespace_module.module_parent
       # remove_const is private, so use send to bypass
       parent_module.send(:remove_const, relative_name)
     end
@@ -543,7 +558,7 @@ class Msf::Modules::Loader::Base
     # Get the parent module from the created module so that
     # restore_namespace_module can remove namespace_module's constant if
     # needed.
-    parent_module = namespace_module.parent
+    parent_module = namespace_module.module_parent
 
     begin
       loaded = block.call(namespace_module)
@@ -570,6 +585,16 @@ class Msf::Modules::Loader::Base
   # @param module_reference_name (see #load_module)
   # @return [String] module content that can be module_evaled into the {#create_namespace_module}
   def read_module_content(parent_path, type, module_reference_name)
+    raise ::NotImplementedError
+  end
+
+  # Read the content of a module
+  #
+  # @abstract Override to read the module content based on the method of the loader subclass and return a string.
+  #
+  # @param full_path Path to the module to be read
+  # @return [String] module content that can be module_evaled into the {#create_namespace_module}
+  def read_module_content_from_path(full_path)
     raise ::NotImplementedError
   end
 

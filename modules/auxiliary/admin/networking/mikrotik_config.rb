@@ -3,8 +3,6 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/auxiliary/mikrotik'
-
 class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::Mikrotik
 
@@ -18,12 +16,16 @@ class MetasploitModule < Msf::Auxiliary
         },
         'License' => MSF_LICENSE,
         'Author' => ['h00die'],
-        'Actions' =>
-          [
-            ['ROUTEROS', 'Description' => 'Import RouterOS Config File'],
-            ['SWOS', 'Description' => 'Import SwOS Config File'],
-          ],
-        'DefaultAction' => 'ROUTEROS'
+        'Actions' => [
+          ['ROUTEROS', { 'Description' => 'Import RouterOS Config File' }],
+          ['SWOS', { 'Description' => 'Import SwOS Config File' }],
+        ],
+        'DefaultAction' => 'ROUTEROS',
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [],
+          'Reliability' => []
+        }
       )
     )
 
@@ -34,12 +36,11 @@ class MetasploitModule < Msf::Auxiliary
         Opt::RPORT(22)
       ]
     )
-
   end
 
   def run
     unless ::File.exist?(datastore['CONFIG'])
-      fail_with(Failure::BadConfig, "Mikrotik config file #{datastore['CONFIG']} does not exists!")
+      fail_with(Failure::BadConfig, "Mikrotik config file #{datastore['CONFIG']} does not exist!")
     end
     mikrotik_config = ::File.open(datastore['CONFIG'], 'rb')
     print_status('Importing config')

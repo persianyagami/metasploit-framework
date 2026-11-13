@@ -1,5 +1,4 @@
 # -*- coding: binary -*-
-require 'msf/core'
 
 module Msf::Payload::NodeJS
   # Outputs a javascript snippet that spawns a bind TCP shell
@@ -86,6 +85,6 @@ module Msf::Payload::NodeJS
   # @param [String] code the javascript code to run
   # @return [String] a command that invokes "node" and passes the code
   def nodejs_cmd(code)
-    "node -e 'eval(\"#{Rex::Text.to_hex(code, "\\x")}\");'"
+    "node -e 'eval(\"#{code.gsub(/[^a-z0-9\s]/i) { |char| Rex::Text.to_hex(char, '\\x') }}\");'"
   end
 end

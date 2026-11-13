@@ -1,9 +1,6 @@
 
 # -*- coding: binary -*-
 
-require 'msf/core'
-require 'msf/core/payload/php/send_uuid'
-
 module Msf
 
 ###
@@ -20,7 +17,7 @@ module Payload::Php::BindTcp
   #
   # Generate the first stage
   #
-  def generate
+  def generate(_opts = {})
     conf = {
       port: datastore['LPORT']
     }

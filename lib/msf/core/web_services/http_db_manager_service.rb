@@ -1,9 +1,10 @@
 require 'rack'
-require 'msf/core/web_services/metasploit_api_app'
+require 'thin'
+require 'rackup/handler/thin'
 require 'metasploit/framework/parsed_options/remote_db'
-require 'rex/ui/text/output/stdio'
 
-class HttpDBManagerService
+# TODO: This functionality isn't fully used currently, it should be integrated and called from the top level msfdb.rb file
+class Msf::WebServices::HttpDBManagerService
 
   def start(opts)
     parsed_options = Metasploit::Framework::ParsedOptions::RemoteDB.new
@@ -26,7 +27,7 @@ class HttpDBManagerService
 
   def start_http_server(opts)
 
-    Rack::Handler::Thin.run(MetasploitApiApp, opts) do |server|
+    Rackup::Handler::Thin.run(Msf::WebServices::MetasploitApiApp, **opts) do |server|
 
       if opts[:ssl] && opts[:ssl] = true
         print_good('SSL Enabled')
@@ -40,7 +41,7 @@ class HttpDBManagerService
   end
 
   def init_db
-    DBManagerProxy.instance
+    Msf::WebServices::DBManagerProxy.instance
   end
 
   def require_environment!(parsed_options)
@@ -62,43 +63,31 @@ class HttpDBManagerService
     Rails.application.require_environment!
   end
 
-  # def init_servlets(http_server)
-  #   servlet_path = File.dirname(__FILE__) + '/servlet/*'
-  #   Dir.glob(servlet_path).collect{|file_path|
-  #     servlet_class = File.basename(file_path, '.rb').classify
-  #     require file_path
-  #     servlet_class_constant = servlet_class.constantize
-  #     http_server.mount servlet_class_constant.api_path, servlet_class_constant
-  #   }
-  # end
-
-
-
-end
-
-
-def print_line(msg)
-  $console_printer.print_line(msg)
-end
-
-def print_warning(msg)
-  $console_printer.print_warning(msg)
-end
-
-def print_good(msg)
-  $console_printer.print_good(msg)
-end
-
-def print_error(msg, exception = nil)
-  unless exception.nil?
-    msg += "\n    Call Stack:"
-    exception.backtrace.each {|line|
-      msg += "\n"
-      msg += "\t #{line}"
-    }
+  def print_line(msg)
+    $console_printer.print_line(msg)
   end
 
-  $console_printer.print_error(msg)
+  def print_warning(msg)
+    $console_printer.print_warning(msg)
+  end
+
+  def print_good(msg)
+    $console_printer.print_good(msg)
+  end
+
+  def print_error(msg, exception = nil)
+    unless exception.nil?
+      msg += "\n    Call Stack:"
+      exception.backtrace.each {|line|
+        msg += "\n"
+        msg += "\t #{line}"
+      }
+    end
+
+    $console_printer.print_error(msg)
+  end
+
+
 end
 
 $console_printer = Rex::Ui::Text::Output::Stdio.new

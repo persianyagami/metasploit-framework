@@ -3,8 +3,6 @@
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core/auxiliary/mikrotik'
-
 class MetasploitModule < Msf::Post
   include Msf::Auxiliary::Mikrotik
 
@@ -20,7 +18,12 @@ class MetasploitModule < Msf::Post
         'License' => MSF_LICENSE,
         'Author' => ['h00die'],
         'Platform' => ['mikrotik'],
-        'SessionTypes' => ['shell']
+        'SessionTypes' => ['shell'],
+        'Notes' => {
+          'Stability' => [CRASH_SAFE],
+          'SideEffects' => [IOC_IN_LOGS],
+          'Reliability' => []
+        }
       )
     )
   end
